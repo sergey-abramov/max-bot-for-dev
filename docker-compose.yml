@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  bot:
+    build: .
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL}
+      - STT_API_URL=http://stt:8000/transcribe
+    env_file:
+      - .env
+
+  stt:
+    build: ./stt-service
+    restart: unless-stopped
