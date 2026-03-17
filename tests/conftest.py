@@ -18,10 +18,14 @@ def _build_engine() -> Engine:
   Строит Engine для тестов.
 
   По умолчанию использует тот же DATABASE_URL, что и приложение.
-  Рекомендуется указывать отдельную БД для тестов через переменную окружения
-  перед запуском pytest (например, maxbot_test).
+  При наличии TEST_DATABASE_URL использует её, чтобы тесты изолированно
+  работали с отдельной тестовой БД.
   """
-  url = get_database_url()
+  test_url = os.getenv("TEST_DATABASE_URL")
+  if test_url:
+    url = test_url
+  else:
+    url = get_database_url()
   return create_engine(url, future=True)
 
 

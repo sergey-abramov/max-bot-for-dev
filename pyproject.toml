@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "max-bot-dev"
+version = "0.1.0"
+description = "Max Bot dev environment (DB, migrations, quiz API)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "alembic>=1.13.0",
+  "sqlalchemy>=2.0.0",
+  "psycopg[binary]>=3.1.0",
+  "fastapi[standard]>=0.115.0",
+  "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+]
+

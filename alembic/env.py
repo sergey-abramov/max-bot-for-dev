@@ -7,12 +7,14 @@ from pathlib import Path
 
 from sqlalchemy import engine_from_config, pool
 from alembic import context
+from dotenv import load_dotenv
 
 # Ensure project root is on PYTHONPATH so that `db` package is importable
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
-  sys.path.insert(0, str(PROJECT_ROOT))
+    sys.path.insert(0, str(PROJECT_ROOT))
 
+load_dotenv(PROJECT_ROOT / ".env")
 # Import metadata and DB config from the app
 from db.base import Base  # noqa: E402
 from db import models as _models  # noqa: F401, E402  # ensure models are imported
@@ -28,7 +30,7 @@ if database_url:
   config.set_main_option("sqlalchemy.url", database_url)
 else:
   # Fallback to application DB config (will raise if env is not configured)
-  config.set_main_option("sqlalchemy.url", get_database_url())
+  config.set_main_option("sqlalchemy.url", get_database_url("postgresql+psycopg://postgres:postgres@localhost:5432/postgres"))
 
 # Interpret the config file for Python logging.
 if config.config_file_name is not None:

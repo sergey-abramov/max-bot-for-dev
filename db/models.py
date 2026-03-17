@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -24,13 +24,13 @@ class User(Base):
   last_name: Mapped[str | None] = mapped_column(String(length=255), nullable=True)
   created_at: Mapped[datetime] = mapped_column(
     DateTime(timezone=True),
-    default=datetime.utcnow,
+    default=func.now,
     nullable=False,
   )
   updated_at: Mapped[datetime] = mapped_column(
     DateTime(timezone=True),
-    default=datetime.utcnow,
-    onupdate=datetime.utcnow,
+    default=func.now,
+    onupdate=func.now,
     nullable=False,
   )
 
@@ -91,7 +91,7 @@ class UserQuestionStat(Base):
   is_correct: Mapped[bool] = mapped_column(Boolean, nullable=False)
   answered_at: Mapped[datetime] = mapped_column(
     DateTime(timezone=True),
-    default=datetime.utcnow,
+    default=func.now,
     nullable=False,
   )
 

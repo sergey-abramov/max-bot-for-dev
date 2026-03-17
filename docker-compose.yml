@@ -6,6 +6,7 @@ services:
     environment:
       - BOT_TOKEN=${BOT_TOKEN}
       - DATABASE_URL=${DATABASE_URL}
+      - QUIZ_API_URL=${QUIZ_API_URL}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - OPENROUTER_MODEL=${OPENROUTER_MODEL}
       - STT_API_URL=http://stt:8000/transcribe
@@ -13,9 +14,26 @@ services:
       - .env
     depends_on:
       - db
+      - quiz-api
   stt:
     build: ./stt-service
     restart: unless-stopped
+
+  quiz-api:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - .:/app
+    command: >
+      bash -c "pip install --no-cache-dir
+      'fastapi[standard]'
+      'sqlalchemy>=2.0'
+      'psycopg[binary]'
+      && uvicorn services.quiz_api:app --host 0.0.0.0 --port 8001"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+    depends_on:
+      - db
 
   db:
     image: postgres:16

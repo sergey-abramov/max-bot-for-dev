@@ -1,21 +1,34 @@
 import os
+from pathlib import Path
 from typing import Optional
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
+from dotenv import load_dotenv
+
+
+# Автоматически подхватываем .env при работе из локального Python-окружения.
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+load_dotenv(PROJECT_ROOT / ".env")
 
 
 def get_database_url(default: Optional[str] = None) -> str:
   """
-  Возвращает URL подключения к базе данных из переменной окружения DATABASE_URL.
+  Возвращает URL подключения к базе данных.
+
+  Приоритет:
+  1. LOCAL_DATABASE_URL — удобно для локальной разработки с host=localhost;
+  2. DATABASE_URL — используется в Docker и может ссылаться на host=db;
+  3. default (если передан).
 
   Ожидаемый формат: postgresql+psycopg://user:password@host:port/dbname
   """
-  url = os.getenv("DATABASE_URL", default)
+  url = os.getenv("LOCAL_DATABASE_URL") or os.getenv("DATABASE_URL", default)
   if not url:
     raise RuntimeError(
-      "DATABASE_URL is not set. "
-      "Укажите строку подключения к PostgreSQL в переменной окружения DATABASE_URL."
+      "DATABASE_URL/LOCAL_DATABASE_URL is not set. "
+      "Укажите строку подключения к PostgreSQL в переменных окружения "
+      "DATABASE_URL или LOCAL_DATABASE_URL, либо передайте default."
     )
   return url
 
