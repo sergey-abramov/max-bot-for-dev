@@ -1,5 +1,7 @@
 import { Keyboard } from '@maxhub/max-bot-api';
 
+const QUIZ_API_URL = process.env.QUIZ_API_URL || 'http://localhost:8001';
+
 const questions = [
   {
     question: 'Что такое ООП?',
@@ -36,7 +38,40 @@ const questions = [
 // userId -> { index, correct }
 const activeQuizzes = new Map();
 
-const getUserId = (ctx) => ctx.user?.user_id ?? ctx.message?.body?.user?.user_id;
+const getUser = (ctx) => ctx.user ?? ctx.message?.body?.user ?? null;
+
+const getUserId = (ctx) => getUser(ctx)?.user_id;
+
+const syncUserWithQuizDb = async (ctx) => {
+  const user = getUser(ctx);
+  if (!user) return;
+
+  try {
+    const response = await fetch(`${QUIZ_API_URL}/users/sync`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        telegram_id: user.user_id,
+        username: user.username ?? null,
+        first_name: user.name ?? null,
+        last_name: null,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error(
+        '[QUIZ_DB_SYNC_ERROR]',
+        'Unexpected status',
+        response.status,
+        await response.text()
+      );
+    }
+  } catch (error) {
+    console.error('[QUIZ_DB_SYNC_ERROR]', error);
+  }
+};
 
 const buildQuestionText = (q, index) => {
   const header = `Вопрос ${index + 1} из ${questions.length}\n${q.question}\n`;
@@ -70,6 +105,8 @@ export const startVictorine = async (ctx) => {
     if (!userId) {
       return ctx.reply('Не удалось определить пользователя для викторины.');
     }
+
+    await syncUserWithQuizDb(ctx);
 
     activeQuizzes.set(userId, {
       index: 0,
