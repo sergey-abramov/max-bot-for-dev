@@ -31,7 +31,7 @@ services:
       'psycopg[binary]'
       && uvicorn services.quiz_api:app --host 0.0.0.0 --port 8001"
     environment:
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=${DATABASE_FOR_QUIZ}
     depends_on:
       - db
 
