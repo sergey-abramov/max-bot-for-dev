@@ -1,9 +1,13 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
-from faster_whisper import WhisperModel
 import uvicorn
 import tempfile
 import os
+
+try:
+    from faster_whisper import WhisperModel
+except ImportError:  # pragma: no cover - optional dependency for dedicated STT service
+    WhisperModel = None
 
 MODEL_SIZE = os.getenv("STT_MODEL_SIZE", "small")
 DEVICE = os.getenv("STT_DEVICE", "cpu")
@@ -11,15 +15,24 @@ COMPUTE_TYPE = os.getenv("STT_COMPUTE_TYPE", "int8")
 
 app = FastAPI(title="STT Service", version="1.0.0")
 
-model = WhisperModel(
-    MODEL_SIZE,
-    device=DEVICE,
-    compute_type=COMPUTE_TYPE,
-)
+if WhisperModel is not None:
+    model = WhisperModel(
+        MODEL_SIZE,
+        device=DEVICE,
+        compute_type=COMPUTE_TYPE,
+    )
+else:
+    model = None
 
 
 @app.post("/transcribe")
 async def transcribe(file: UploadFile = File(...)):
+    if model is None:
+        raise HTTPException(
+            status_code=503,
+            detail="STT model is unavailable. Install optional dependency: pip install -e '.[stt]'",
+        )
+
     if not file.content_type or not file.content_type.startswith("audio/"):
         raise HTTPException(status_code=400, detail="Expected audio file")
 
