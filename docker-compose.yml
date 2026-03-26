@@ -1,5 +1,7 @@
 version: '3.8'
 
+# Legacy local runtime only.
+# Production deployment path is Vercel Serverless + webhook.
 services:
   bot:
     build: .
@@ -29,6 +31,7 @@ services:
       'fastapi[standard]'
       'sqlalchemy>=2.0'
       'psycopg[binary]'
+      'httpx>=0.27'
       && uvicorn services.quiz_api:app --host 0.0.0.0 --port 8001"
     environment:
       - DATABASE_URL=${DATABASE_FOR_QUIZ}

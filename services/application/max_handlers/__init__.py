@@ -1,0 +1,3 @@
+"""
+MAX event handlers.
+"""

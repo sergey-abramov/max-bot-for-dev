@@ -1,0 +1,43 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/index.py": {
+      "runtime": "python3.12"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/webhooks/max",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/users/sync",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/topics",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/topics/:slug/random-question",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/answers/submit",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/docs",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/redoc",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/openapi.json",
+      "destination": "/api/index.py"
+    }
+  ]
+}
+

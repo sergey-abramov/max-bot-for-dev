@@ -2,6 +2,7 @@ import { OpenRouter } from '@openrouter/sdk';
 import {
   openrouterApiKey,
   openrouterModel,
+  sttEnabled,
   sttApiKey,
   sttApiUrl,
   sttModel,
@@ -163,6 +164,12 @@ export const handleAiMessage = async (ctx) => {
 
   try {
     if (hasAudioAttachment && !text) {
+      if (!sttEnabled) {
+        return ctx.reply(
+          'Голосовые сообщения временно отключены в текущем окружении. Отправьте вопрос текстом.'
+        );
+      }
+
       const url = extractAudioUrl(audioAttachment);
       if (!url) {
         return ctx.reply(
