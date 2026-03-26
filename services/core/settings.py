@@ -11,9 +11,7 @@ load_dotenv()
 
 @dataclass(frozen=True, slots=True)
 class Settings:
-  max_webhook_secret: str = ""
-  max_webhook_path: str = "/webhooks/max"
-  max_webhook_secret_header: str = "X-Max-Webhook-Secret"
+  max_webhook_path: str = "https://platform-api.max.ru/subscriptions"
   max_bot_token: str = ""
   max_bot_mode: str = "webhook"
   database_url: str = ""
@@ -32,8 +30,6 @@ class Settings:
         f"Unsupported MAX_BOT_MODE={self.max_bot_mode!r}. "
         "Only webhook mode is allowed for this runtime."
       )
-    if self.is_production() and not self.max_webhook_secret:
-      raise ValueError("MAX_WEBHOOK_SECRET is required in production.")
 
 
 def get_settings() -> Settings:
@@ -45,9 +41,7 @@ def get_settings() -> Settings:
   ).strip().lower()
 
   return Settings(
-    max_webhook_secret=os.getenv("MAX_WEBHOOK_SECRET", "").strip(),
-    max_webhook_path=os.getenv("MAX_WEBHOOK_PATH", "/webhooks/max").strip(),
-    max_webhook_secret_header=os.getenv("MAX_WEBHOOK_SECRET_HEADER", "X-Max-Webhook-Secret").strip(),
+    max_webhook_path=os.getenv("MAX_WEBHOOK_PATH", "https://platform-api.max.ru/subscriptions").strip(),
     max_bot_token=os.getenv("MAX_BOT_TOKEN", "").strip(),
     max_bot_mode=os.getenv("MAX_BOT_MODE", "webhook").strip().lower(),
     database_url=os.getenv("DATABASE_URL", "").strip(),

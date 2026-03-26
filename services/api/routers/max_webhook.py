@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import time
-from hmac import compare_digest
 from threading import Lock
 from typing import Optional
 
@@ -43,25 +42,12 @@ def _is_duplicate(event_id: str) -> bool:
     return False
 
 
-def _validate_secret(settings: Settings, secret_header_value: Optional[str]) -> None:
-  if settings.is_production() and not settings.max_webhook_secret:
-    raise HTTPException(status_code=500, detail="Webhook secret is not configured")
-
-  if not settings.max_webhook_secret:
-    return
-  if not compare_digest(secret_header_value or "", settings.max_webhook_secret):
-    raise HTTPException(status_code=401, detail="Invalid webhook secret")
-
-
 @router.post("")
 async def receive_webhook(
   request: Request,
 ) -> dict:
   settings: Settings = request.app.state.settings
   dispatcher: MaxEventDispatcher = request.app.state.max_event_dispatcher
-
-  incoming_secret = request.headers.get(settings.max_webhook_secret_header)
-  _validate_secret(settings, incoming_secret)
 
   try:
     payload = await request.json()

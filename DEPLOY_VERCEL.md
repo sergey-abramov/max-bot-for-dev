@@ -9,7 +9,6 @@
 
 - Аккаунт Vercel и доступ к проекту.
 - Токен бота Max (`MAX_BOT_TOKEN`).
-- Секрет для webhook (`MAX_WEBHOOK_SECRET`).
 - Рабочая PostgreSQL-база (`DATABASE_URL`).
 - Ключ OpenRouter (`OPENROUTER_API_KEY`), если нужен AI-чат.
 
@@ -27,7 +26,6 @@ cp .env.example .env
 
 - `MAX_BOT_TOKEN`
 - `DATABASE_URL`
-- `MAX_WEBHOOK_SECRET`
 - `OPENROUTER_API_KEY`
 - `OPENROUTER_MODEL` (можно оставить дефолт)
 - `MAX_BOT_MODE=webhook`
@@ -35,7 +33,6 @@ cp .env.example .env
 Рекомендуемые значения:
 
 - `MAX_WEBHOOK_PATH=/webhooks/max`
-- `MAX_WEBHOOK_SECRET_HEADER=X-Max-Webhook-Secret`
 - `APP_ENV=development` (локально)
 
 ## 3) Проверка API локально перед деплоем
@@ -85,9 +82,7 @@ vercel --prod
 
 - `MAX_BOT_TOKEN`
 - `DATABASE_URL`
-- `MAX_WEBHOOK_SECRET`
 - `MAX_WEBHOOK_PATH` = `/webhooks/max`
-- `MAX_WEBHOOK_SECRET_HEADER` = `X-Max-Webhook-Secret`
 - `MAX_BOT_MODE` = `webhook`
 - `APP_ENV` = `production`
 
@@ -112,8 +107,6 @@ vercel --prod
 
 `https://<your-project>.vercel.app/webhooks/max`
 
-И передайте тот же секрет, что в `MAX_WEBHOOK_SECRET`.
-
 ## 7) Проверка после релиза
 
 Минимальный smoke-check:
@@ -121,7 +114,6 @@ vercel --prod
 1. Отправьте тестовый webhook update.
 2. Убедитесь, что endpoint отвечает `200` и `{"ok": true}`.
 3. Проверьте, что `/docs` и `/openapi.json` открываются.
-4. Проверьте, что неправильный секрет дает `401`.
 
 Проверка CLI-логов:
 
@@ -130,11 +122,6 @@ vercel logs <deployment-url>
 ```
 
 ## 8) Типичные проблемы
-
-### 401 Invalid webhook secret
-
-- Секрет в платформе и `MAX_WEBHOOK_SECRET` не совпадают.
-- Неверный заголовок (проверьте `MAX_WEBHOOK_SECRET_HEADER`).
 
 ### 500 Webhook dispatch failed
 
@@ -161,4 +148,4 @@ vercel logs <deployment-url>
   - `/topics/:slug/random-question`
   - `/answers/submit`
   - `/docs`, `/redoc`, `/openapi.json`
-- В production рантайм валидирует режим и секрет webhook.
+- В production рантайм валидирует режим webhook.

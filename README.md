@@ -25,7 +25,7 @@ Max Bot — бот для MaxHub с викториной и чатом с ИИ
    ```bash
    cp .env.example .env
    # отредактируйте .env и задайте:
-   # MAX_BOT_TOKEN, DATABASE_URL, MAX_WEBHOOK_SECRET,
+   # MAX_BOT_TOKEN, DATABASE_URL,
    # OPENROUTER_API_KEY, OPENROUTER_MODEL
    ```
 
@@ -149,12 +149,7 @@ Runbook: webhook lifecycle
    - Убедитесь, что публичный URL доступен и `POST /webhooks/max` роутится в `api/index.py`.
    - Зарегистрируйте webhook URL во внешней платформе.
 
-2. **Ротация секрета webhook**
-   - Обновите `MAX_WEBHOOK_SECRET` в Vercel Environment Variables.
-   - Синхронизируйте этот же секрет во внешней платформе webhook.
-   - Проверьте, что запросы с неверным секретом получают `401`.
-
-3. **Проверка после релиза**
+2. **Проверка после релиза**
    - Отправьте тестовый webhook update и проверьте `200`.
    - Проверьте базовый end-to-end путь: update -> dispatcher -> handler -> DB.
    - Убедитесь, что `MAX_BOT_MODE=webhook` и polling runtime не используется.
