@@ -7,14 +7,16 @@ from typing import Any
 from services.application.max_handlers.bot_started import handle_bot_started
 from services.application.max_handlers.message_callback import handle_message_callback
 from services.application.max_handlers.message_created import handle_message_created
+from services.integrations.max_api_client import MaxApiClient
 
 logger = logging.getLogger(__name__)
 
-Handler = Callable[[dict[str, Any]], Awaitable[None]]
+Handler = Callable[[dict[str, Any], MaxApiClient], Awaitable[None]]
 
 
 class MaxEventDispatcher:
-  def __init__(self) -> None:
+  def __init__(self, max_api_client: MaxApiClient) -> None:
+    self._max_api_client = max_api_client
     self._handlers: dict[str, Handler] = {
       "bot_started": handle_bot_started,
       "message_created": handle_message_created,
@@ -32,4 +34,4 @@ class MaxEventDispatcher:
       logger.info("MAX webhook: no handler registered", extra={"update_type": update_type})
       return
 
-    await handler(update)
+    await handler(update, self._max_api_client)

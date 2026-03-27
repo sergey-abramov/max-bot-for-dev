@@ -11,7 +11,7 @@ load_dotenv()
 
 @dataclass(frozen=True, slots=True)
 class Settings:
-  max_webhook_path: str = "https://platform-api.max.ru/subscriptions"
+  max_webhook_path: str = "/platform-api.max.ru/subscriptions"
   max_bot_token: str = ""
   max_bot_mode: str = "webhook"
   database_url: str = ""
@@ -40,8 +40,11 @@ def get_settings() -> Settings:
     or "development"
   ).strip().lower()
 
+  raw_webhook_path = os.getenv("MAX_WEBHOOK_PATH", "/platform-api.max.ru/subscriptions").strip()
+  max_webhook_path = raw_webhook_path if raw_webhook_path.startswith("/") else f"/{raw_webhook_path.lstrip('/')}"
+
   return Settings(
-    max_webhook_path=os.getenv("MAX_WEBHOOK_PATH", "https://platform-api.max.ru/subscriptions").strip(),
+    max_webhook_path=max_webhook_path,
     max_bot_token=os.getenv("MAX_BOT_TOKEN", "").strip(),
     max_bot_mode=os.getenv("MAX_BOT_MODE", "webhook").strip().lower(),
     database_url=os.getenv("DATABASE_URL", "").strip(),

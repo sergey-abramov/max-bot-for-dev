@@ -16,7 +16,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
   app.state.settings = resolved_settings
   app.state.max_api_client = MaxApiClient(bot_token=resolved_settings.max_bot_token)
-  app.state.max_event_dispatcher = MaxEventDispatcher()
+  app.state.max_event_dispatcher = MaxEventDispatcher(max_api_client=app.state.max_api_client)
 
   app.include_router(quiz_router)
   app.include_router(max_webhook_router, prefix=resolved_settings.max_webhook_path)
