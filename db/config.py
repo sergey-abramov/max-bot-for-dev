@@ -30,7 +30,24 @@ def get_database_url(default: Optional[str] = None) -> str:
       "Укажите строку подключения к PostgreSQL в переменных окружения "
       "DATABASE_URL или LOCAL_DATABASE_URL, либо передайте default."
     )
-  return url
+  return _normalize_sqlalchemy_url(url)
+
+
+def _normalize_sqlalchemy_url(url: str) -> str:
+  """
+  Нормализует URL для SQLAlchemy.
+
+  Поддерживает входной формат postgres://..., который часто отдают
+  managed-провайдеры, и приводит его к postgresql+psycopg://...
+  """
+  normalized = url.strip()
+  if normalized.startswith("postgresql+psycopg://"):
+    return normalized
+  if normalized.startswith("postgresql://"):
+    return "postgresql+psycopg://" + normalized[len("postgresql://") :]
+  if normalized.startswith("postgres://"):
+    return "postgresql+psycopg://" + normalized[len("postgres://") :]
+  return normalized
 
 
 def create_engine_from_env(
