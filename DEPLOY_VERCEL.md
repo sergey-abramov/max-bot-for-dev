@@ -14,7 +14,7 @@
 
 Важно:
 - В production используйте только `MAX_BOT_MODE=webhook`.
-- Внешняя платформа Max должна отправлять webhook в ваш публичный URL.
+- При включенной автоподписке приложение само регистрирует webhook в MAX API.
 
 ## 2) Локальная подготовка проекта
 
@@ -32,7 +32,9 @@ cp .env.example .env
 
 Рекомендуемые значения:
 
+- `PUBLIC_BASE_URL=https://max-bot-for-dev.vercel.app`
 - `MAX_WEBHOOK_PATH=/webhooks/max`
+- `MAX_WEBHOOK_AUTOSUBSCRIBE=true`
 - `APP_ENV=development` (локально)
 
 ## 3) Проверка API локально перед деплоем
@@ -82,7 +84,9 @@ vercel --prod
 
 - `MAX_BOT_TOKEN`
 - `DATABASE_URL`
+- `PUBLIC_BASE_URL` = `https://max-bot-for-dev.vercel.app` (или ваш production-домен)
 - `MAX_WEBHOOK_PATH` = `/webhooks/max`
+- `MAX_WEBHOOK_AUTOSUBSCRIBE` = `true`
 - `MAX_BOT_MODE` = `webhook`
 - `APP_ENV` = `production`
 
@@ -97,15 +101,19 @@ vercel --prod
 
 После изменения env-переменных делайте redeploy.
 
-## 6) Настройка webhook во внешней платформе
+## 6) Подписка webhook (автоматически из приложения)
 
 После production-деплоя получите URL вида:
 
 `https://<your-project>.vercel.app`
 
-Укажите webhook URL:
+При старте production runtime приложение вызывает `POST /subscriptions` в MAX API и регистрирует URL:
 
 `https://<your-project>.vercel.app/webhooks/max`
+
+Если подписка уже существует, приложение не создает дубль.
+
+Ручная настройка во внешней платформе нужна только как fallback, если автоподписка отключена.
 
 ## 7) Проверка после релиза
 
@@ -114,6 +122,7 @@ vercel --prod
 1. Отправьте тестовый webhook update.
 2. Убедитесь, что endpoint отвечает `200` и `{"ok": true}`.
 3. Проверьте, что `/docs` и `/openapi.json` открываются.
+4. Проверьте логи старта: должна быть запись `MAX webhook autosubscribe finished`.
 
 Проверка CLI-логов:
 
@@ -127,6 +136,12 @@ vercel logs <deployment-url>
 
 - Проблема в обработчике события или внешнем API.
 - Смотрите runtime-логи Vercel.
+
+### Webhook-события не приходят
+
+- Проверьте `PUBLIC_BASE_URL` и `MAX_WEBHOOK_PATH` (итоговый URL должен быть HTTPS и доступен извне).
+- Убедитесь, что `MAX_WEBHOOK_AUTOSUBSCRIBE=true` в production.
+- Проверьте логи старта на сообщение `MAX webhook autosubscribe failed`.
 
 ### Ошибка запуска Python на деплое
 

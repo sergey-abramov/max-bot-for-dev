@@ -11,7 +11,9 @@ load_dotenv()
 
 @dataclass(frozen=True, slots=True)
 class Settings:
-  max_webhook_path: str = "/platform-api.max.ru/subscriptions"
+  max_webhook_path: str = "/webhooks/max"
+  public_base_url: str = ""
+  max_webhook_autosubscribe: bool = False
   max_bot_token: str = ""
   max_bot_mode: str = "webhook"
   database_url: str = ""
@@ -31,6 +33,12 @@ class Settings:
         "Only webhook mode is allowed for this runtime."
       )
 
+  def webhook_public_url(self) -> str:
+    base = self.public_base_url.strip().rstrip("/")
+    if not base:
+      return ""
+    return f"{base}{self.max_webhook_path}"
+
 
 def get_settings() -> Settings:
   app_env = (
@@ -40,11 +48,15 @@ def get_settings() -> Settings:
     or "development"
   ).strip().lower()
 
-  raw_webhook_path = os.getenv("MAX_WEBHOOK_PATH", "/platform-api.max.ru/subscriptions").strip()
+  raw_webhook_path = os.getenv("MAX_WEBHOOK_PATH", "/webhooks/max").strip()
   max_webhook_path = raw_webhook_path if raw_webhook_path.startswith("/") else f"/{raw_webhook_path.lstrip('/')}"
+  public_base_url = os.getenv("PUBLIC_BASE_URL", "").strip()
+  max_webhook_autosubscribe = os.getenv("MAX_WEBHOOK_AUTOSUBSCRIBE", "false").strip().lower() in ("1", "true", "yes", "on")
 
   return Settings(
     max_webhook_path=max_webhook_path,
+    public_base_url=public_base_url,
+    max_webhook_autosubscribe=max_webhook_autosubscribe,
     max_bot_token=os.getenv("MAX_BOT_TOKEN", "").strip(),
     max_bot_mode=os.getenv("MAX_BOT_MODE", "webhook").strip().lower(),
     database_url=os.getenv("DATABASE_URL", "").strip(),
