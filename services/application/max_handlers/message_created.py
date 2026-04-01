@@ -6,7 +6,7 @@ from typing import Any
 import httpx
 from db.session import get_session
 from services import quiz_service
-from services.application.max_handlers.common import extract_message_text, extract_user, extract_user_id, send_text
+from services.application.max_handlers.common import dump_identity, extract_message_text, extract_user, extract_user_id, send_text
 from services.application.max_handlers.state_store import AI_CHAT_USERS, QUIZ_QUESTIONS_PER_SESSION, QUIZ_USERS, QuizSession
 
 from services.integrations.max_api_client import MaxApiClient
@@ -103,6 +103,10 @@ async def handle_message_created(update: dict[str, Any], max_api_client: MaxApiC
         ]
       ),
     )
+    return
+
+  if text in ("/whoami", "/debug_user"):
+    await send_text(max_api_client, update, dump_identity(update))
     return
 
   if text == "/quiz":
