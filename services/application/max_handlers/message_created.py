@@ -6,7 +6,14 @@ from typing import Any
 import httpx
 from db.session import get_session
 from services import quiz_service
-from services.application.max_handlers.common import dump_identity, extract_message_text, extract_user, extract_user_id, send_text
+from services.application.max_handlers.common import (
+  dump_identity,
+  extract_message_text,
+  extract_user,
+  extract_user_id,
+  send_message,
+  send_text,
+)
 from services.application.max_handlers.state_store import AI_CHAT_USERS, QUIZ_QUESTIONS_PER_SESSION, QUIZ_USERS, QuizSession
 
 from services.integrations.max_api_client import MaxApiClient
@@ -15,12 +22,26 @@ logger = logging.getLogger(__name__)
 
 
 def _build_start_menu() -> str:
-  return (
-    "Добро пожаловать! Выберите действие:\n"
-    "- /info — информация о вас\n"
-    "- /quiz — викторина по Java\n"
-    "- /ai — чат с ИИ"
-  )
+  return "Добро пожаловать! Выберите действие:"
+
+
+def _build_main_menu_attachments() -> list[dict[str, Any]]:
+  return [
+    {
+      "type": "inline_keyboard",
+      "payload": {
+        "buttons": [
+          [
+            {"type": "callback", "text": "ℹ️ Информация обо мне", "payload": "menu:hello"},
+            {"type": "callback", "text": "📝 Викторина по Java", "payload": "menu:victorine"},
+          ],
+          [
+            {"type": "callback", "text": "🤖 Чат с ИИ", "payload": "menu:chat_ai"},
+          ],
+        ]
+      },
+    }
+  ]
 
 
 def _build_question_text(question: Any, index: int, total_planned: int) -> str:
@@ -85,7 +106,12 @@ async def handle_message_created(update: dict[str, Any], max_api_client: MaxApiC
     AI_CHAT_USERS.discard(user_id)
 
   if text == "/start":
-    await send_text(max_api_client, update, _build_start_menu())
+    await send_message(
+      max_api_client,
+      update,
+      text=_build_start_menu(),
+      attachments=_build_main_menu_attachments(),
+    )
     return
 
   if text == "/info":
@@ -186,4 +212,9 @@ async def handle_message_created(update: dict[str, Any], max_api_client: MaxApiC
       await send_text(max_api_client, update, "Не удалось получить ответ от ИИ. Попробуйте позже.")
     return
 
-  await send_text(max_api_client, update, 'Напишите /start и выберите режим: /quiz, /ai или /info.')
+  await send_message(
+      max_api_client,
+      update,
+      text=_build_start_menu(),
+      attachments=_build_main_menu_attachments(),
+    )

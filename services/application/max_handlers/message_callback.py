@@ -5,7 +5,7 @@ from typing import Any
 
 from db.session import get_session
 from services import quiz_service
-from services.application.max_handlers.common import extract_callback_payload, extract_user, extract_user_id, send_text
+from services.application.max_handlers.common import extract_callback_payload, extract_user, extract_user_id, send_message, send_text
 from services.application.max_handlers.state_store import AI_CHAT_USERS, QUIZ_QUESTIONS_PER_SESSION, QUIZ_USERS, QuizSession
 from services.integrations.max_api_client import MaxApiClient
 
@@ -17,6 +17,22 @@ def _build_question_text(question: Any, index: int, total_planned: int) -> str:
   options = question.options or {}
   rows = [f"{key}. {value}" for key, value in sorted(options.items(), key=lambda item: item[0])]
   return f"{header}\n" + "\n\n".join(rows)
+
+
+def _build_topic_attachments(topics: list[Any]) -> list[dict[str, Any]]:
+  buttons = []
+  for topic in topics:
+    buttons.append([{"type": "callback", "text": topic.title, "payload": f"victorine:topic:{topic.slug}"}])
+  return [{"type": "inline_keyboard", "payload": {"buttons": buttons}}]
+
+
+def _build_answer_attachments(topic_slug: str, question_id: int, options: dict[str, str] | None) -> list[dict[str, Any]]:
+  keys = sorted((options or {}).keys())
+  row = [
+    {"type": "callback", "text": key, "payload": f"victorine:answer:{topic_slug}:{question_id}:{key}"}
+    for key in keys
+  ]
+  return [{"type": "inline_keyboard", "payload": {"buttons": [row]}}]
 
 
 async def handle_message_callback(update: dict[str, Any], max_api_client: MaxApiClient) -> None:
@@ -54,9 +70,32 @@ async def handle_message_callback(update: dict[str, Any], max_api_client: MaxApi
       if not topics:
         await send_text(max_api_client, update, "Сейчас нет доступных тем викторины. Попробуйте позже.")
         return
-      lines = ["Выберите тему викторины, отправив команду: /quiz <slug>", ""]
-      lines.extend([f"- {topic.title}: /quiz {topic.slug}" for topic in topics])
-      await send_text(max_api_client, update, "\n".join(lines))
+      await send_message(
+        max_api_client,
+        update,
+        text="Запускаем викторину! Выберите тему:",
+        attachments=_build_topic_attachments(topics),
+      )
+    return
+
+  if payload.startswith("victorine:topic:"):
+    _, _, topic_slug = payload.split(":", 2)
+    with get_session() as session:
+      topic = quiz_service.get_topic_by_slug(session=session, slug=topic_slug)
+      if topic is None or not topic.is_active:
+        await send_text(max_api_client, update, "Выбранная тема недоступна. Попробуйте снова.")
+        return
+      question = quiz_service.get_random_question_for_topic(session=session, topic_id=topic.id)
+      if question is None:
+        await send_text(max_api_client, update, "Для этой темы пока нет вопросов.")
+        return
+      QUIZ_USERS[user_id] = QuizSession(topic_slug=topic.slug, topic_title=topic.title, current_question_id=question.id)
+      await send_message(
+        max_api_client,
+        update,
+        text=_build_question_text(question, 0, QUIZ_QUESTIONS_PER_SESSION),
+        attachments=_build_answer_attachments(topic.slug, question.id, question.options),
+      )
     return
 
   if not payload.startswith("victorine:answer:"):
@@ -122,8 +161,9 @@ async def handle_message_callback(update: dict[str, Any], max_api_client: MaxApi
       QUIZ_USERS.pop(user_id, None)
       return
     state.current_question_id = next_question.id
-    await send_text(
+    await send_message(
       max_api_client,
       update,
-      _build_question_text(next_question, state.total, QUIZ_QUESTIONS_PER_SESSION),
+      text=_build_question_text(next_question, state.total, QUIZ_QUESTIONS_PER_SESSION),
+      attachments=_build_answer_attachments(state.topic_slug, next_question.id, next_question.options),
     )

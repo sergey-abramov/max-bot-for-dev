@@ -135,10 +135,23 @@ def dump_identity(update: dict[str, Any]) -> str:
 
 
 async def send_text(max_api_client: MaxApiClient, update: dict[str, Any], text: str) -> None:
+  await send_message(max_api_client, update, text=text)
+
+
+async def send_message(
+  max_api_client: MaxApiClient,
+  update: dict[str, Any],
+  *,
+  text: str,
+  attachments: list[dict[str, Any]] | None = None,
+) -> None:
   target = extract_reply_target(update)
   if not target:
     logger.warning("MAX webhook: reply target missing, cannot send message", extra={"update": update})
     return
   query = urlencode(target)
-  await max_api_client.post(f"/messages?{query}", {"text": text})
+  body: dict[str, Any] = {"text": text}
+  if attachments:
+    body["attachments"] = attachments
+  await max_api_client.post(f"/messages?{query}", body)
 
