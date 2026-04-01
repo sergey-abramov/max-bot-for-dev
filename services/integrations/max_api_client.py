@@ -9,7 +9,10 @@ class MaxApiClient:
     self._base_url = base_url.rstrip("/")
 
   def _headers(self) -> dict[str, str]:
-    return {"Authorization": f"Bearer {self._bot_token}"} if self._bot_token else {}
+    if not self._bot_token:
+      return {}
+    # MAX API expects Authorization header without forcing Bearer scheme.
+    return {"Authorization": self._bot_token.strip()}
 
   async def post(self, path: str, payload: dict) -> dict:
     url = f"{self._base_url}/{path.lstrip('/')}"
