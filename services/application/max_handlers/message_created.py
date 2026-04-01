@@ -80,9 +80,8 @@ async def handle_message_created(update: dict[str, Any], max_api_client: MaxApiC
   user_id = extract_user_id(update)
   if not user_id:
     logger.warning("MAX webhook: message received but user_id missing", extra={"update": update})
-    return
 
-  if text.startswith("/"):
+  if user_id and text.startswith("/"):
     AI_CHAT_USERS.discard(user_id)
 
   if text == "/start":
@@ -107,22 +106,29 @@ async def handle_message_created(update: dict[str, Any], max_api_client: MaxApiC
     return
 
   if text == "/quiz":
+    if not user_id:
+      await send_text(max_api_client, update, "Не удалось определить пользователя для викторины.")
+      return
     await _start_quiz(update, max_api_client, user_id)
     return
 
   if text == "/ai":
+    if not user_id:
+      await send_text(max_api_client, update, "Не удалось определить пользователя для режима ИИ.")
+      return
     QUIZ_USERS.pop(user_id, None)
     AI_CHAT_USERS.add(user_id)
     await send_text(max_api_client, update, "Режим чата с ИИ включен. Отправьте ваш вопрос.")
     return
 
   if text == "/stop":
-    AI_CHAT_USERS.discard(user_id)
-    QUIZ_USERS.pop(user_id, None)
+    if user_id:
+      AI_CHAT_USERS.discard(user_id)
+      QUIZ_USERS.pop(user_id, None)
     await send_text(max_api_client, update, "Режимы сброшены. Напишите /start.")
     return
 
-  quiz = QUIZ_USERS.get(user_id)
+  quiz = QUIZ_USERS.get(user_id) if user_id else None
   if quiz is not None:
     selected_key = text.strip().upper()
     with get_session() as session:
@@ -164,7 +170,7 @@ async def handle_message_created(update: dict[str, Any], max_api_client: MaxApiC
       await send_text(max_api_client, update, _build_question_text(question, quiz.total, QUIZ_QUESTIONS_PER_SESSION))
     return
 
-  if user_id in AI_CHAT_USERS:
+  if user_id and user_id in AI_CHAT_USERS:
     try:
       from services.core.settings import get_settings
 

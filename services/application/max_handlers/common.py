@@ -32,13 +32,42 @@ def extract_user(update: dict[str, Any]) -> dict[str, Any]:
   payload = update.get("payload") or {}
   message = payload.get("message") or {}
   sender = message.get("sender") or payload.get("sender") or {}
-  return sender if isinstance(sender, dict) else {}
+  if isinstance(sender, dict) and sender:
+    return sender
+  body = message.get("body") or {}
+  body_user = body.get("user")
+  if isinstance(body_user, dict) and body_user:
+    return body_user
+  update_user = update.get("user")
+  if isinstance(update_user, dict) and update_user:
+    return update_user
+  return {}
 
 
 def extract_user_id(update: dict[str, Any]) -> str:
+  payload = update.get("payload") or {}
+  message = payload.get("message") or {}
+  body = message.get("body") or {}
+  recipient = message.get("recipient") or payload.get("recipient") or {}
+  sender = message.get("sender") or payload.get("sender") or {}
   user = extract_user(update)
-  user_id = user.get("user_id")
-  return str(user_id).strip() if user_id is not None else ""
+
+  candidates = [
+    user.get("user_id") if isinstance(user, dict) else None,
+    sender.get("user_id") if isinstance(sender, dict) else None,
+    body.get("user_id") if isinstance(body, dict) else None,
+    (body.get("user") or {}).get("user_id") if isinstance(body, dict) and isinstance(body.get("user"), dict) else None,
+    recipient.get("user_id") if isinstance(recipient, dict) else None,
+    payload.get("user_id"),
+    update.get("user_id"),
+  ]
+  for value in candidates:
+    if value is None:
+      continue
+    text = str(value).strip()
+    if text:
+      return text
+  return ""
 
 
 def extract_message_text(update: dict[str, Any]) -> str:
