@@ -2,53 +2,178 @@ from __future__ import annotations
 
 import logging
 from typing import Any
-from urllib.parse import urlencode
+
+import httpx
+from db.session import get_session
+from services import quiz_service
+from services.application.max_handlers.common import extract_message_text, extract_user, extract_user_id, send_text
+from services.application.max_handlers.state_store import AI_CHAT_USERS, QUIZ_QUESTIONS_PER_SESSION, QUIZ_USERS, QuizSession
 
 from services.integrations.max_api_client import MaxApiClient
 
 logger = logging.getLogger(__name__)
 
 
-def _extract_message_text(update: dict[str, Any]) -> str:
-  payload = update.get("payload") or {}
-  message = payload.get("message") or {}
-  body = message.get("body") or {}
-  text = body.get("text") or payload.get("text") or update.get("text") or ""
-  return str(text).strip()
+def _build_start_menu() -> str:
+  return (
+    "Добро пожаловать! Выберите действие:\n"
+    "- /info — информация о вас\n"
+    "- /quiz — викторина по Java\n"
+    "- /ai — чат с ИИ"
+  )
 
 
-def _extract_reply_target(update: dict[str, Any]) -> dict[str, str]:
-  payload = update.get("payload") or {}
-  message = payload.get("message") or {}
-  recipient = message.get("recipient") or payload.get("recipient") or {}
-  chat = recipient.get("chat") or payload.get("chat") or {}
-  sender = message.get("sender") or payload.get("sender") or {}
+def _build_question_text(question: Any, index: int, total_planned: int) -> str:
+  header = f"Вопрос {index + 1} из {total_planned}\n{question.text}\n"
+  options = question.options or {}
+  rows = [f"{key}. {value}" for key, value in sorted(options.items(), key=lambda item: item[0])]
+  return f"{header}\n" + "\n\n".join(rows)
 
-  chat_id = recipient.get("chat_id") or message.get("chat_id") or chat.get("chat_id")
-  if chat_id is not None:
-    return {"chat_id": str(chat_id)}
 
-  user_id = sender.get("user_id") or recipient.get("user_id") or payload.get("user_id")
-  if user_id is not None:
-    return {"user_id": str(user_id)}
+async def _call_openrouter(question: str, api_key: str, model: str) -> str:
+  if not api_key:
+    return "OPENROUTER_API_KEY не настроен."
+  async with httpx.AsyncClient(timeout=30.0) as client:
+    response = await client.post(
+      "https://openrouter.ai/api/v1/chat/completions",
+      headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+      json={
+        "model": model,
+        "messages": [
+          {"role": "system", "content": "Ты дружелюбный русскоязычный ассистент. Отвечай кратко и по делу."},
+          {"role": "user", "content": question},
+        ],
+      },
+    )
+    response.raise_for_status()
+    data = response.json()
+    return str((data.get("choices") or [{}])[0].get("message", {}).get("content") or "").strip() or "Не удалось получить ответ от модели."
 
-  return {}
+
+async def _start_quiz(update: dict[str, Any], max_api_client: MaxApiClient, user_id: str) -> None:
+  with get_session() as session:
+    topics = quiz_service.list_active_topics(session=session)
+    if not topics:
+      await send_text(max_api_client, update, "Сейчас нет доступных тем викторины. Попробуйте позже.")
+      return
+    default_topic = topics[0]
+    question = quiz_service.get_random_question_for_topic(session=session, topic_id=default_topic.id)
+    if question is None:
+      await send_text(max_api_client, update, "Для выбранной темы нет вопросов.")
+      return
+    QUIZ_USERS[user_id] = QuizSession(
+      topic_slug=default_topic.slug,
+      topic_title=default_topic.title,
+      current_question_id=question.id,
+    )
+    await send_text(
+      max_api_client,
+      update,
+      f"Запускаем викторину по теме «{default_topic.title}».\n\n{_build_question_text(question, 0, QUIZ_QUESTIONS_PER_SESSION)}",
+    )
 
 
 async def handle_message_created(update: dict[str, Any], max_api_client: MaxApiClient) -> None:
   logger.info("MAX webhook: message_created handled", extra={"update": update})
 
-  text = _extract_message_text(update)
-  if text != "/start":
+  text = extract_message_text(update)
+  user_id = extract_user_id(update)
+  if not user_id:
+    logger.warning("MAX webhook: message received but user_id missing", extra={"update": update})
     return
 
-  target = _extract_reply_target(update)
-  if not target:
-    logger.warning("MAX webhook: /start received but reply target missing", extra={"update": update})
+  if text.startswith("/"):
+    AI_CHAT_USERS.discard(user_id)
+
+  if text == "/start":
+    await send_text(max_api_client, update, _build_start_menu())
     return
 
-  query = urlencode(target)
-  await max_api_client.post(
-    f"/messages?{query}",
-    {"text": "Добро пожаловать! Бот запущен. Напишите сообщение или выберите действие в меню."},
-  )
+  if text == "/info":
+    user = extract_user(update)
+    await send_text(
+      max_api_client,
+      update,
+      "\n".join(
+        [
+          "Информация о вас:",
+          f"ID: {user.get('user_id', 'неизвестно')}",
+          f"Имя: {user.get('name', 'неизвестно')}",
+          f"Username: {user.get('username', 'не задан')}",
+          f"Роль: {user.get('role', 'неизвестно')}",
+        ]
+      ),
+    )
+    return
+
+  if text == "/quiz":
+    await _start_quiz(update, max_api_client, user_id)
+    return
+
+  if text == "/ai":
+    QUIZ_USERS.pop(user_id, None)
+    AI_CHAT_USERS.add(user_id)
+    await send_text(max_api_client, update, "Режим чата с ИИ включен. Отправьте ваш вопрос.")
+    return
+
+  if text == "/stop":
+    AI_CHAT_USERS.discard(user_id)
+    QUIZ_USERS.pop(user_id, None)
+    await send_text(max_api_client, update, "Режимы сброшены. Напишите /start.")
+    return
+
+  quiz = QUIZ_USERS.get(user_id)
+  if quiz is not None:
+    selected_key = text.strip().upper()
+    with get_session() as session:
+      user = extract_user(update)
+      result = quiz_service.submit_answer(
+        session=session,
+        telegram_id=int(user_id),
+        question_id=quiz.current_question_id,
+        selected_key=selected_key,
+        username=user.get("username"),
+        first_name=user.get("name"),
+        last_name=None,
+      )
+      if result.is_correct:
+        quiz.correct += 1
+        await send_text(max_api_client, update, "Верно ✅")
+      else:
+        await send_text(max_api_client, update, f"Неверно ❌\nПравильный ответ: {result.correct_key}")
+      quiz.total += 1
+      if quiz.total >= QUIZ_QUESTIONS_PER_SESSION:
+        await send_text(
+          max_api_client,
+          update,
+          f"Тест по теме «{quiz.topic_title}» завершён! Ваш результат: {quiz.correct} из {quiz.total}.",
+        )
+        QUIZ_USERS.pop(user_id, None)
+        return
+      topic = quiz_service.get_topic_by_slug(session=session, slug=quiz.topic_slug)
+      if topic is None:
+        await send_text(max_api_client, update, "Тема викторины недоступна. Запустите /quiz заново.")
+        QUIZ_USERS.pop(user_id, None)
+        return
+      question = quiz_service.get_random_question_for_topic(session=session, topic_id=topic.id)
+      if question is None:
+        await send_text(max_api_client, update, "Вопросы закончились. Запустите /quiz заново.")
+        QUIZ_USERS.pop(user_id, None)
+        return
+      quiz.current_question_id = question.id
+      await send_text(max_api_client, update, _build_question_text(question, quiz.total, QUIZ_QUESTIONS_PER_SESSION))
+    return
+
+  if user_id in AI_CHAT_USERS:
+    try:
+      from services.core.settings import get_settings
+
+      resolved = get_settings()
+      answer = await _call_openrouter(text, resolved.openrouter_api_key, resolved.openrouter_model)
+      await send_text(max_api_client, update, answer)
+    except Exception:
+      logger.exception("MAX webhook: ai response failed")
+      await send_text(max_api_client, update, "Не удалось получить ответ от ИИ. Попробуйте позже.")
+    return
+
+  await send_text(max_api_client, update, 'Напишите /start и выберите режим: /quiz, /ai или /info.')

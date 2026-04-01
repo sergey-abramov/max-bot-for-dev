@@ -19,6 +19,8 @@ class Settings:
   database_url: str = ""
   test_database_url: str = ""
   quiz_api_url: str = ""
+  openrouter_api_key: str = ""
+  openrouter_model: str = "qwen/qwen-2.5-7b-instruct"
   stt_api_url: str = ""
   max_stt_enabled: bool = False
   app_env: str = "development"
@@ -62,6 +64,8 @@ def get_settings() -> Settings:
     database_url=os.getenv("DATABASE_URL", "").strip(),
     test_database_url=os.getenv("TEST_DATABASE_URL", "").strip(),
     quiz_api_url=os.getenv("QUIZ_API_URL", "").strip(),
+    openrouter_api_key=os.getenv("OPENROUTER_API_KEY", "").strip(),
+    openrouter_model=os.getenv("OPENROUTER_MODEL", "qwen/qwen-2.5-7b-instruct").strip(),
     stt_api_url=os.getenv("STT_API_URL", "").strip(),
     max_stt_enabled=(os.getenv("MAX_STT_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on")),
     app_env=app_env,
