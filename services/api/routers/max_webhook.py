@@ -61,8 +61,10 @@ async def receive_webhook(
   update_type = payload.get("update_type")
 
   logger.info(
-    "MAX webhook: update received",
-    extra={"event_id": event_id, "update_type": update_type},
+    "MAX webhook request received: event_id=%s update_type=%s payload=%s",
+    event_id,
+    update_type,
+    payload,
   )
 
   if event_id and _is_duplicate(event_id):

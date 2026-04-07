@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Any
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 
 class RosPatentClientError(Exception):
@@ -70,6 +73,7 @@ class RosPatentApiClient:
       "pat_text": query,
       "count": count,
     }
+    logger.info("RosPatent integration request: method=POST url=%s body=%s", url, payload)
 
     try:
       async with httpx.AsyncClient(timeout=self._timeout) as client:
@@ -90,6 +94,12 @@ class RosPatentApiClient:
       data = response.json()
     except (httpx.HTTPStatusError, ValueError) as exc:
       raise RosPatentClientError("Unexpected RosPatent response.") from exc
+    logger.info(
+      "RosPatent integration response: method=POST url=%s status=%s body=%s",
+      url,
+      response.status_code,
+      data,
+    )
 
     hits = data.get("hits") if isinstance(data, dict) else None
     if not isinstance(hits, list):

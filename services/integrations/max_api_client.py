@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import logging
+
 import httpx
+
+logger = logging.getLogger(__name__)
 
 
 class MaxApiClient:
@@ -16,17 +20,33 @@ class MaxApiClient:
 
   async def post(self, path: str, payload: dict) -> dict:
     url = f"{self._base_url}/{path.lstrip('/')}"
+    logger.info("MAX integration request: method=POST url=%s body=%s", url, payload)
     async with httpx.AsyncClient(timeout=10.0) as client:
       response = await client.post(url, json=payload, headers=self._headers())
       response.raise_for_status()
-      return response.json()
+      response_payload = response.json()
+      logger.info(
+        "MAX integration response: method=POST url=%s status=%s body=%s",
+        url,
+        response.status_code,
+        response_payload,
+      )
+      return response_payload
 
   async def get(self, path: str) -> dict:
     url = f"{self._base_url}/{path.lstrip('/')}"
+    logger.info("MAX integration request: method=GET url=%s", url)
     async with httpx.AsyncClient(timeout=10.0) as client:
       response = await client.get(url, headers=self._headers())
       response.raise_for_status()
-      return response.json()
+      response_payload = response.json()
+      logger.info(
+        "MAX integration response: method=GET url=%s status=%s body=%s",
+        url,
+        response.status_code,
+        response_payload,
+      )
+      return response_payload
 
   async def list_subscriptions(self) -> list[dict]:
     payload = await self.get("/subscriptions")
