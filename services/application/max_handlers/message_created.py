@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
+from urllib.parse import quote_plus
 
 import httpx
 from db.session import get_session
@@ -14,9 +16,23 @@ from services.application.max_handlers.common import (
   send_message,
   send_text,
 )
-from services.application.max_handlers.state_store import AI_CHAT_USERS, QUIZ_QUESTIONS_PER_SESSION, QUIZ_USERS, QuizSession
+from services.application.max_handlers.state_store import (
+  AI_CHAT_USERS,
+  PATENT_SEARCH_USERS,
+  QUIZ_QUESTIONS_PER_SESSION,
+  QUIZ_USERS,
+  QuizSession,
+)
+from services.core.settings import get_settings
 
 from services.integrations.max_api_client import MaxApiClient
+from services.integrations.rospatent_api_client import (
+  RosPatentApiClient,
+  RosPatentAuthError,
+  RosPatentClientError,
+  RosPatentQueryError,
+  RosPatentUnavailableError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,11 +53,63 @@ def _build_main_menu_attachments() -> list[dict[str, Any]]:
           ],
           [
             {"type": "callback", "text": "🤖 Чат с ИИ", "payload": "menu:chat_ai"},
+            {"type": "callback", "text": "🔎 Поиск патентов", "payload": "menu:patent_search"},
           ],
         ]
       },
     }
   ]
+
+
+def _normalize_query(text: str) -> str:
+  return " ".join((text or "").split()).strip()
+
+
+def _is_valid_patent_query(text: str) -> bool:
+  normalized = _normalize_query(text)
+  if len(normalized) < 8:
+    return False
+  if not any(char.isalpha() for char in normalized):
+    return False
+  meaningful = [char.lower() for char in normalized if char.isalnum()]
+  if len(meaningful) < 5:
+    return False
+  if len(set(meaningful)) < 3:
+    return False
+  if re.fullmatch(r"[\W_]+", normalized):
+    return False
+  return True
+
+
+def _truncate(value: str, *, max_len: int = 300) -> str:
+  text = _normalize_query(value)
+  if len(text) <= max_len:
+    return text
+  return f"{text[: max_len - 1].rstrip()}…"
+
+
+def _build_patent_public_url(patent_id: str) -> str:
+  return f"https://searchplatform.rospatent.gov.ru/patsearch?query={quote_plus(patent_id)}"
+
+
+def _build_patent_attachments(patent_id: str) -> list[dict[str, Any]]:
+  return [
+    {
+      "type": "inline_keyboard",
+      "payload": {
+        "buttons": [[{"type": "link", "text": "Открыть патент", "url": _build_patent_public_url(patent_id)}]]
+      },
+    }
+  ]
+
+
+async def _send_main_menu(update: dict[str, Any], max_api_client: MaxApiClient) -> None:
+  await send_message(
+    max_api_client,
+    update,
+    text=_build_start_menu(),
+    attachments=_build_main_menu_attachments(),
+  )
 
 
 def _build_question_text(question: Any, index: int, total_planned: int) -> str:
@@ -104,6 +172,7 @@ async def handle_message_created(update: dict[str, Any], max_api_client: MaxApiC
 
   if user_id and text.startswith("/"):
     AI_CHAT_USERS.discard(user_id)
+    PATENT_SEARCH_USERS.discard(user_id)
 
   if text == "/start":
     await send_message(
@@ -147,6 +216,7 @@ async def handle_message_created(update: dict[str, Any], max_api_client: MaxApiC
       await send_text(max_api_client, update, "Не удалось определить пользователя для режима ИИ.")
       return
     QUIZ_USERS.pop(user_id, None)
+    PATENT_SEARCH_USERS.discard(user_id)
     AI_CHAT_USERS.add(user_id)
     await send_text(max_api_client, update, "Режим чата с ИИ включен. Отправьте ваш вопрос.")
     return
@@ -155,6 +225,7 @@ async def handle_message_created(update: dict[str, Any], max_api_client: MaxApiC
     if user_id:
       AI_CHAT_USERS.discard(user_id)
       QUIZ_USERS.pop(user_id, None)
+      PATENT_SEARCH_USERS.discard(user_id)
     await send_text(max_api_client, update, "Режимы сброшены. Напишите /start.")
     return
 
@@ -212,9 +283,69 @@ async def handle_message_created(update: dict[str, Any], max_api_client: MaxApiC
       await send_text(max_api_client, update, "Не удалось получить ответ от ИИ. Попробуйте позже.")
     return
 
-  await send_message(
-      max_api_client,
-      update,
-      text=_build_start_menu(),
-      attachments=_build_main_menu_attachments(),
-    )
+  if user_id and user_id in PATENT_SEARCH_USERS:
+    PATENT_SEARCH_USERS.discard(user_id)
+    query = _normalize_query(text)
+    if not _is_valid_patent_query(query):
+      await send_text(
+        max_api_client,
+        update,
+        "Уточните запрос (например, добавьте дату, город, отрасль, ключевые слова).",
+      )
+      await _send_main_menu(update, max_api_client)
+      return
+
+    try:
+      settings = get_settings()
+      client = RosPatentApiClient(settings.rospatent_api_key)
+      hits = await client.similar_text_search(query, count=5)
+    except RosPatentAuthError:
+      await send_text(
+        max_api_client,
+        update,
+        "Сервис поиска патентов временно недоступен: проблема с API ключом.",
+      )
+      await _send_main_menu(update, max_api_client)
+      return
+    except RosPatentQueryError:
+      await send_text(
+        max_api_client,
+        update,
+        "Не удалось обработать запрос. Попробуйте уточнить формулировку.",
+      )
+      await _send_main_menu(update, max_api_client)
+      return
+    except RosPatentUnavailableError:
+      await send_text(max_api_client, update, "Сервис временно недоступен. Попробуйте позже.")
+      await _send_main_menu(update, max_api_client)
+      return
+    except RosPatentClientError:
+      logger.exception("MAX webhook: RosPatent integration failed")
+      await send_text(max_api_client, update, "Не удалось выполнить поиск патентов. Попробуйте позже.")
+      await _send_main_menu(update, max_api_client)
+      return
+    except Exception:
+      logger.exception("MAX webhook: unexpected RosPatent failure")
+      await send_text(max_api_client, update, "Не удалось выполнить поиск патентов. Попробуйте позже.")
+      await _send_main_menu(update, max_api_client)
+      return
+
+    if not hits:
+      await send_text(max_api_client, update, "Ничего не найдено. Попробуйте переформулировать запрос.")
+      await _send_main_menu(update, max_api_client)
+      return
+
+    for idx, hit in enumerate(hits[:5], start=1):
+      title = _truncate(hit.title or f"Патент #{hit.id}", max_len=120)
+      description = _truncate(hit.description or "Описание отсутствует.", max_len=300)
+      await send_message(
+        max_api_client,
+        update,
+        text=f"{idx}. {title}\n\n{description}",
+        attachments=_build_patent_attachments(hit.id),
+      )
+
+    await _send_main_menu(update, max_api_client)
+    return
+
+  await _send_main_menu(update, max_api_client)

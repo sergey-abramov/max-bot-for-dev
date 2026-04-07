@@ -26,7 +26,8 @@ Max Bot — бот для MaxHub с викториной и чатом с ИИ
    cp .env.example .env
    # отредактируйте .env и задайте:
    # MAX_BOT_TOKEN, DATABASE_URL,
-   # OPENROUTER_API_KEY, OPENROUTER_MODEL
+   # OPENROUTER_API_KEY, OPENROUTER_MODEL,
+   # ROSPATENT_API_KEY
    ```
 
 3. Для локальной проверки Python API (без Docker) запустите:

@@ -6,7 +6,13 @@ from typing import Any
 from db.session import get_session
 from services import quiz_service
 from services.application.max_handlers.common import extract_callback_payload, extract_user, extract_user_id, send_message, send_text
-from services.application.max_handlers.state_store import AI_CHAT_USERS, QUIZ_QUESTIONS_PER_SESSION, QUIZ_USERS, QuizSession
+from services.application.max_handlers.state_store import (
+  AI_CHAT_USERS,
+  PATENT_SEARCH_USERS,
+  QUIZ_QUESTIONS_PER_SESSION,
+  QUIZ_USERS,
+  QuizSession,
+)
 from services.integrations.max_api_client import MaxApiClient
 
 logger = logging.getLogger(__name__)
@@ -59,12 +65,21 @@ async def handle_message_callback(update: dict[str, Any], max_api_client: MaxApi
 
   if payload == "menu:chat_ai":
     QUIZ_USERS.pop(user_id, None)
+    PATENT_SEARCH_USERS.discard(user_id)
     AI_CHAT_USERS.add(user_id)
     await send_text(max_api_client, update, "Вы в режиме чата с ИИ. Отправьте вопрос текстом.")
     return
 
+  if payload == "menu:patent_search":
+    QUIZ_USERS.pop(user_id, None)
+    AI_CHAT_USERS.discard(user_id)
+    PATENT_SEARCH_USERS.add(user_id)
+    await send_text(max_api_client, update, "Введите поисковый запрос")
+    return
+
   if payload == "menu:victorine":
     AI_CHAT_USERS.discard(user_id)
+    PATENT_SEARCH_USERS.discard(user_id)
     with get_session() as session:
       topics = quiz_service.list_active_topics(session=session)
       if not topics:

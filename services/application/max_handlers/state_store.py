@@ -14,5 +14,6 @@ class QuizSession:
 
 AI_CHAT_USERS: set[str] = set()
 QUIZ_USERS: dict[str, QuizSession] = {}
+PATENT_SEARCH_USERS: set[str] = set()
 QUIZ_QUESTIONS_PER_SESSION = 3
 
