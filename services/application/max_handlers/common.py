@@ -52,6 +52,10 @@ def extract_reply_target(update: dict[str, Any]) -> dict[str, str]:
 def extract_user(update: dict[str, Any]) -> dict[str, Any]:
   payload = update.get("payload") or {}
   message = payload.get("message") or update.get("message") or {}
+  callback = payload.get("callback") or update.get("callback") or {}
+  callback_user = callback.get("user") if isinstance(callback, dict) else None
+  if isinstance(callback_user, dict) and callback_user:
+    return callback_user
   sender = message.get("sender") or payload.get("sender") or {}
   if isinstance(sender, dict) and sender:
     return sender
@@ -71,9 +75,12 @@ def extract_user_id(update: dict[str, Any]) -> str:
   body = message.get("body") or {}
   recipient = message.get("recipient") or payload.get("recipient") or {}
   sender = message.get("sender") or payload.get("sender") or {}
+  callback = payload.get("callback") or update.get("callback") or {}
   user = extract_user(update)
 
   candidates = [
+    callback.get("user_id") if isinstance(callback, dict) else None,
+    (callback.get("user") or {}).get("user_id") if isinstance(callback, dict) and isinstance(callback.get("user"), dict) else None,
     user.get("user_id") if isinstance(user, dict) else None,
     sender.get("user_id") if isinstance(sender, dict) else None,
     body.get("user_id") if isinstance(body, dict) else None,
