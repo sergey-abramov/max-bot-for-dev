@@ -85,8 +85,11 @@ class RosPatentApiClient:
       raise RosPatentAuthError("RosPatent authorization failed.")
     if response.status_code in (400, 500):
       details = self._extract_error_details(response)
+      logger.error("RosPatent integration error: method=POST url=%s status=%s body=%s", url, response.status_code, details)
       raise RosPatentQueryError(details or "RosPatent query is invalid or ambiguous.")
     if response.status_code >= 500:
+      details = self._extract_error_details(response)
+      logger.error("RosPatent integration error: method=POST url=%s status=%s body=%s", url, response.status_code, details)
       raise RosPatentUnavailableError("RosPatent service returned a server error.")
 
     try:
