@@ -38,7 +38,7 @@ class RosPatentApiClient:
     api_key: str,
     *,
     base_url: str = "https://searchplatform.rospatent.gov.ru",
-    timeout: float = 10.0,
+    timeout: float = 120.0,
   ) -> None:
     self._api_key = api_key.strip()
     self._base_url = base_url.rstrip("/")
