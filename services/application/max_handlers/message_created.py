@@ -67,12 +67,12 @@ def _normalize_query(text: str) -> str:
 
 def _is_valid_patent_query(text: str) -> bool:
   normalized = _normalize_query(text)
-  if len(normalized) < 8:
+  if len(normalized) < 3:
     return False
   if not any(char.isalpha() for char in normalized):
     return False
   meaningful = [char.lower() for char in normalized if char.isalnum()]
-  if len(meaningful) < 5:
+  if len(meaningful) < 3:
     return False
   if len(set(meaningful)) < 3:
     return False
@@ -273,8 +273,6 @@ async def handle_message_created(update: dict[str, Any], max_api_client: MaxApiC
 
   if user_id and user_id in AI_CHAT_USERS:
     try:
-      from services.core.settings import get_settings
-
       resolved = get_settings()
       answer = await _call_openrouter(text, resolved.openrouter_api_key, resolved.openrouter_model)
       await send_text(max_api_client, update, answer)
