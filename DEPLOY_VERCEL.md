@@ -101,6 +101,28 @@ vercel --prod
 
 После изменения env-переменных делайте redeploy.
 
+## 5.1) CI-миграции через GitHub Actions
+
+В репозитории добавлен workflow: `.github/workflows/db-migrate.yml`.
+
+Что делает workflow:
+
+- запускается вручную из GitHub UI (`Run workflow`);
+- запускается автоматически при push в `master`, если изменились файлы миграций/БД;
+- выполняет `alembic upgrade head` и затем `alembic current`.
+
+Обязательная настройка:
+
+1. В GitHub -> Settings -> Secrets and variables -> Actions создайте secret:
+   - `DATABASE_URL` = production URL вашей PostgreSQL БД (с `sslmode=require` при необходимости).
+2. Убедитесь, что это тот же production DB, который использует Vercel.
+
+Рекомендуемый порядок релиза:
+
+1. Merge/push изменений.
+2. Дождаться успешного выполнения workflow `DB Migrations`.
+3. Проверить webhook smoke-check из раздела 7.
+
 ## 6) Подписка webhook (автоматически из приложения)
 
 После production-деплоя получите URL вида:

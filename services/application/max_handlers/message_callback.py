@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from sqlalchemy.exc import SQLAlchemyError
+
 from db.session import get_session
 from services import quiz_service
 from services.application.max_handlers.common import extract_callback_payload, extract_user, extract_user_id, send_message, send_text
@@ -16,6 +18,12 @@ from services.application.max_handlers.state_store import (
 from services.integrations.max_api_client import MaxApiClient
 
 logger = logging.getLogger(__name__)
+
+
+DB_UNAVAILABLE_MESSAGE = (
+  "База данных не инициализирована. "
+  "Сообщите администратору и попробуйте позже."
+)
 
 
 def _build_question_text(question: Any, index: int, total_planned: int) -> str:
@@ -80,37 +88,45 @@ async def handle_message_callback(update: dict[str, Any], max_api_client: MaxApi
   if payload == "menu:victorine":
     AI_CHAT_USERS.discard(user_id)
     PATENT_SEARCH_USERS.discard(user_id)
-    with get_session() as session:
-      topics = quiz_service.list_active_topics(session=session)
-      if not topics:
-        await send_text(max_api_client, update, "Сейчас нет доступных тем викторины. Попробуйте позже.")
-        return
-      await send_message(
-        max_api_client,
-        update,
-        text="Запускаем викторину! Выберите тему:",
-        attachments=_build_topic_attachments(topics),
-      )
+    try:
+      with get_session() as session:
+        topics = quiz_service.list_active_topics(session=session)
+        if not topics:
+          await send_text(max_api_client, update, "Сейчас нет доступных тем викторины. Попробуйте позже.")
+          return
+        await send_message(
+          max_api_client,
+          update,
+          text="Запускаем викторину! Выберите тему:",
+          attachments=_build_topic_attachments(topics),
+        )
+    except SQLAlchemyError:
+      logger.exception("MAX webhook: failed to load quiz topics", extra={"user_id": user_id, "payload": payload})
+      await send_text(max_api_client, update, DB_UNAVAILABLE_MESSAGE)
     return
 
   if payload.startswith("victorine:topic:"):
     _, _, topic_slug = payload.split(":", 2)
-    with get_session() as session:
-      topic = quiz_service.get_topic_by_slug(session=session, slug=topic_slug)
-      if topic is None or not topic.is_active:
-        await send_text(max_api_client, update, "Выбранная тема недоступна. Попробуйте снова.")
-        return
-      question = quiz_service.get_random_question_for_topic(session=session, topic_id=topic.id)
-      if question is None:
-        await send_text(max_api_client, update, "Для этой темы пока нет вопросов.")
-        return
-      QUIZ_USERS[user_id] = QuizSession(topic_slug=topic.slug, topic_title=topic.title, current_question_id=question.id)
-      await send_message(
-        max_api_client,
-        update,
-        text=_build_question_text(question, 0, QUIZ_QUESTIONS_PER_SESSION),
-        attachments=_build_answer_attachments(topic.slug, question.id, question.options),
-      )
+    try:
+      with get_session() as session:
+        topic = quiz_service.get_topic_by_slug(session=session, slug=topic_slug)
+        if topic is None or not topic.is_active:
+          await send_text(max_api_client, update, "Выбранная тема недоступна. Попробуйте снова.")
+          return
+        question = quiz_service.get_random_question_for_topic(session=session, topic_id=topic.id)
+        if question is None:
+          await send_text(max_api_client, update, "Для этой темы пока нет вопросов.")
+          return
+        QUIZ_USERS[user_id] = QuizSession(topic_slug=topic.slug, topic_title=topic.title, current_question_id=question.id)
+        await send_message(
+          max_api_client,
+          update,
+          text=_build_question_text(question, 0, QUIZ_QUESTIONS_PER_SESSION),
+          attachments=_build_answer_attachments(topic.slug, question.id, question.options),
+        )
+    except SQLAlchemyError:
+      logger.exception("MAX webhook: failed to load quiz topic", extra={"user_id": user_id, "topic_slug": topic_slug})
+      await send_text(max_api_client, update, DB_UNAVAILABLE_MESSAGE)
     return
 
   if not payload.startswith("victorine:answer:"):
@@ -138,47 +154,52 @@ async def handle_message_callback(update: dict[str, Any], max_api_client: MaxApi
     return
 
   user = extract_user(update)
-  with get_session() as session:
-    result = quiz_service.submit_answer(
-      session=session,
-      telegram_id=int(user_id),
-      question_id=question_id,
-      selected_key=selected_key,
-      username=user.get("username"),
-      first_name=user.get("name"),
-      last_name=None,
-    )
+  try:
+    with get_session() as session:
+      result = quiz_service.submit_answer(
+        session=session,
+        telegram_id=int(user_id),
+        question_id=question_id,
+        selected_key=selected_key,
+        username=user.get("username"),
+        first_name=user.get("name"),
+        last_name=None,
+      )
 
-    if result.is_correct:
-      state.correct += 1
-      await send_text(max_api_client, update, "Верно ✅")
-    else:
-      await send_text(max_api_client, update, f"Неверно ❌\nПравильный ответ: {result.correct_key}")
+      if result.is_correct:
+        state.correct += 1
+        await send_text(max_api_client, update, "Верно ✅")
+      else:
+        await send_text(max_api_client, update, f"Неверно ❌\nПравильный ответ: {result.correct_key}")
 
-    state.total += 1
-    if state.total >= QUIZ_QUESTIONS_PER_SESSION:
-      await send_text(
+      state.total += 1
+      if state.total >= QUIZ_QUESTIONS_PER_SESSION:
+        await send_text(
+          max_api_client,
+          update,
+          f"Тест по теме «{state.topic_title}» завершён! Ваш результат: {state.correct} из {state.total}.",
+        )
+        QUIZ_USERS.pop(user_id, None)
+        return
+
+      topic = quiz_service.get_topic_by_slug(session=session, slug=state.topic_slug)
+      if topic is None:
+        await send_text(max_api_client, update, "Тема викторины недоступна. Запустите /quiz заново.")
+        QUIZ_USERS.pop(user_id, None)
+        return
+      next_question = quiz_service.get_random_question_for_topic(session=session, topic_id=topic.id)
+      if next_question is None:
+        await send_text(max_api_client, update, "Вопросы закончились. Запустите /quiz заново.")
+        QUIZ_USERS.pop(user_id, None)
+        return
+      state.current_question_id = next_question.id
+      await send_message(
         max_api_client,
         update,
-        f"Тест по теме «{state.topic_title}» завершён! Ваш результат: {state.correct} из {state.total}.",
+        text=_build_question_text(next_question, state.total, QUIZ_QUESTIONS_PER_SESSION),
+        attachments=_build_answer_attachments(state.topic_slug, next_question.id, next_question.options),
       )
-      QUIZ_USERS.pop(user_id, None)
-      return
-
-    topic = quiz_service.get_topic_by_slug(session=session, slug=state.topic_slug)
-    if topic is None:
-      await send_text(max_api_client, update, "Тема викторины недоступна. Запустите /quiz заново.")
-      QUIZ_USERS.pop(user_id, None)
-      return
-    next_question = quiz_service.get_random_question_for_topic(session=session, topic_id=topic.id)
-    if next_question is None:
-      await send_text(max_api_client, update, "Вопросы закончились. Запустите /quiz заново.")
-      QUIZ_USERS.pop(user_id, None)
-      return
-    state.current_question_id = next_question.id
-    await send_message(
-      max_api_client,
-      update,
-      text=_build_question_text(next_question, state.total, QUIZ_QUESTIONS_PER_SESSION),
-      attachments=_build_answer_attachments(state.topic_slug, next_question.id, next_question.options),
-    )
+  except SQLAlchemyError:
+    logger.exception("MAX webhook: failed to process quiz answer", extra={"user_id": user_id, "question_id": question_id})
+    QUIZ_USERS.pop(user_id, None)
+    await send_text(max_api_client, update, DB_UNAVAILABLE_MESSAGE)
