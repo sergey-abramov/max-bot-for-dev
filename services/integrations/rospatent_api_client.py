@@ -58,7 +58,9 @@ class RosPatentApiClient:
       return None
 
     hit_id = str(raw_hit.get("id") or "").strip()
-    title = str(snippet.get("title") or "").strip()
+    biblio = raw_hit.get("biblio")
+    biblio_ru = biblio.get("ru", {}) if isinstance(biblio, dict) else {}
+    title = str(snippet.get("title") or biblio_ru.get("title") or "").strip()
     description = str(snippet.get("description") or "").strip()
 
     if not hit_id and not title and not description:
@@ -67,11 +69,12 @@ class RosPatentApiClient:
     return RosPatentHit(id=hit_id, title=title, description=description)
 
   async def similar_text_search(self, query: str, *, count: int = 5) -> list[RosPatentHit]:
-    url = f"{self._base_url}/patsearch/v0.2/similar_search"
+    url = f"{self._base_url}/patsearch/v0.2/search"
+    safe_count = max(int(count), 0)
     payload = {
-      "type_search": "text_search",
-      "pat_text": query,
-      "count": count,
+      "qn": query,
+      "limit": safe_count,
+      "offset": 0,
     }
     logger.info("RosPatent integration request: method=POST url=%s body=%s", url, payload)
 
@@ -114,7 +117,7 @@ class RosPatentApiClient:
       if normalized_hit is not None:
         normalized.append(normalized_hit)
 
-    return normalized[: max(count, 0)]
+    return normalized[:safe_count]
 
   @staticmethod
   def _extract_error_details(response: httpx.Response) -> str:
