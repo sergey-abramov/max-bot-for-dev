@@ -88,6 +88,28 @@ def _truncate(value: str, *, max_len: int = 300) -> str:
   return f"{text[: max_len - 1].rstrip()}…"
 
 
+def _build_patent_card_text(idx: int, hit: Any) -> str:
+  title = _truncate(hit.title or f"Патент #{hit.id}", max_len=120)
+  description = _truncate(hit.description or "Описание отсутствует.", max_len=300)
+
+  header_lines: list[str] = [f"{idx}. {title}"]
+  if hit.ipc:
+    header_lines.append(f"МПК: {hit.ipc}")
+  if hit.document:
+    document_line = f"Документ: {hit.document}"
+    if hit.publication_date:
+      document_line = f"{document_line} ({hit.publication_date})"
+    header_lines.append(document_line)
+  elif hit.publication_date:
+    header_lines.append(f"Дата публикации: {hit.publication_date}")
+  if hit.applicant:
+    header_lines.append(f"Заявитель: {hit.applicant}")
+  if hit.author:
+    header_lines.append(f"Автор: {hit.author}")
+
+  return "\n".join(header_lines) + f"\n\n{description}"
+
+
 def _build_patent_public_url(patent_id: str) -> str:
   return f"https://searchplatform.rospatent.gov.ru/patsearch?query={quote_plus(patent_id)}"
 
@@ -334,12 +356,10 @@ async def handle_message_created(update: dict[str, Any], max_api_client: MaxApiC
       return
 
     for idx, hit in enumerate(hits[:5], start=1):
-      title = _truncate(hit.title or f"Патент #{hit.id}", max_len=120)
-      description = _truncate(hit.description or "Описание отсутствует.", max_len=300)
       await send_message(
         max_api_client,
         update,
-        text=f"{idx}. {title}\n\n{description}",
+        text=_build_patent_card_text(idx, hit),
         attachments=_build_patent_attachments(hit.id),
       )
 

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import html
 import logging
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -30,6 +32,11 @@ class RosPatentHit:
   id: str
   title: str
   description: str
+  document: str
+  publication_date: str
+  applicant: str
+  author: str
+  ipc: str
 
 
 class RosPatentApiClient:
@@ -60,13 +67,37 @@ class RosPatentApiClient:
     hit_id = str(raw_hit.get("id") or "").strip()
     biblio = raw_hit.get("biblio")
     biblio_ru = biblio.get("ru", {}) if isinstance(biblio, dict) else {}
-    title = str(snippet.get("title") or biblio_ru.get("title") or "").strip()
-    description = str(snippet.get("description") or "").strip()
+    title = self._normalize_markup_text(str(snippet.get("title") or biblio_ru.get("title") or "").strip())
+    description = self._normalize_markup_text(str(snippet.get("description") or "").strip())
+    document = self._extract_document_info(raw_hit, biblio_ru, hit_id)
+    publication_date = self._extract_text_field(
+      biblio_ru,
+      (
+        "publication_date",
+        "publishing_date",
+        "published_at",
+        "date_publish",
+        "pub_date",
+        "date",
+      ),
+    )
+    applicant = self._extract_text_field(biblio_ru, ("applicant", "applicants", "holder", "holders"))
+    author = self._extract_text_field(biblio_ru, ("author", "authors", "inventor", "inventors"))
+    ipc = self._extract_text_field(biblio_ru, ("ipc", "ipc_index", "mki", "mpk", "classification"))
 
     if not hit_id and not title and not description:
       return None
 
-    return RosPatentHit(id=hit_id, title=title, description=description)
+    return RosPatentHit(
+      id=hit_id,
+      title=title,
+      description=description,
+      document=document,
+      publication_date=publication_date,
+      applicant=applicant,
+      author=author,
+      ipc=ipc,
+    )
 
   async def similar_text_search(self, query: str, *, count: int = 5) -> list[RosPatentHit]:
     url = f"{self._base_url}/patsearch/v0.2/search"
@@ -110,6 +141,7 @@ class RosPatentApiClient:
     hits = data.get("hits") if isinstance(data, dict) else None
     if not isinstance(hits, list):
       return []
+    self._log_hit_schema(hits)
 
     normalized: list[RosPatentHit] = []
     for item in hits:
@@ -118,6 +150,27 @@ class RosPatentApiClient:
         normalized.append(normalized_hit)
 
     return normalized[:safe_count]
+
+  def _log_hit_schema(self, hits: list[Any]) -> None:
+    sample_limit = 2
+    for idx, hit in enumerate(hits[:sample_limit], start=1):
+      if not isinstance(hit, dict):
+        logger.info("RosPatent hit schema sample #%s: non-dict hit type=%s", idx, type(hit).__name__)
+        continue
+
+      biblio = hit.get("biblio")
+      biblio_ru = biblio.get("ru", {}) if isinstance(biblio, dict) and isinstance(biblio.get("ru"), dict) else {}
+      snippet = hit.get("snippet")
+      snippet_dict = snippet if isinstance(snippet, dict) else {}
+
+      logger.info(
+        "RosPatent hit schema sample #%s: top_keys=%s biblio_ru_keys=%s snippet_keys=%s id=%s",
+        idx,
+        sorted(hit.keys()),
+        sorted(biblio_ru.keys()),
+        sorted(snippet_dict.keys()),
+        str(hit.get("id") or ""),
+      )
 
   @staticmethod
   def _extract_error_details(response: httpx.Response) -> str:
@@ -135,3 +188,58 @@ class RosPatentApiClient:
       return str(payload)
 
     return str(payload)
+
+  @staticmethod
+  def _normalize_markup_text(value: str) -> str:
+    if not value:
+      return ""
+    # RosPatent uses <em> for highlights; MAX markdown supports ***text*** better.
+    text = re.sub(r"(?is)<\s*em\s*>(.*?)<\s*/\s*em\s*>", r"***\1***", value)
+    text = re.sub(r"(?is)<[^>]+>", "", text)
+    return html.unescape(text).strip()
+
+  @staticmethod
+  def _stringify(value: Any) -> str:
+    if value is None:
+      return ""
+    if isinstance(value, str):
+      return value.strip()
+    if isinstance(value, dict):
+      for key in ("name", "value", "title", "text", "ru", "en"):
+        nested = value.get(key)
+        if isinstance(nested, str) and nested.strip():
+          return nested.strip()
+      return ""
+    if isinstance(value, list):
+      parts = [RosPatentApiClient._stringify(item) for item in value]
+      compact = [part for part in parts if part]
+      return ", ".join(compact)
+    return str(value).strip()
+
+  @staticmethod
+  def _extract_text_field(source: dict[str, Any], keys: tuple[str, ...]) -> str:
+    for key in keys:
+      value = RosPatentApiClient._stringify(source.get(key))
+      if value:
+        return RosPatentApiClient._normalize_markup_text(value)
+    return ""
+
+  @staticmethod
+  def _extract_document_info(raw_hit: dict[str, Any], biblio_ru: dict[str, Any], fallback_id: str) -> str:
+    document = RosPatentApiClient._extract_text_field(
+      biblio_ru,
+      ("document", "doc_number", "document_number", "publication_number", "patent_number", "number"),
+    )
+    kind = RosPatentApiClient._extract_text_field(biblio_ru, ("kind", "kind_code", "document_kind"))
+    country = RosPatentApiClient._extract_text_field(biblio_ru, ("country", "country_code", "office"))
+
+    if not document:
+      # A few payloads include document marker outside biblio.ru.
+      document = RosPatentApiClient._extract_text_field(
+        raw_hit,
+        ("document", "doc_number", "document_number", "publication_number", "patent_number"),
+      )
+    if not document:
+      document = fallback_id
+
+    return " ".join(part for part in (country, document, kind) if part).strip()
