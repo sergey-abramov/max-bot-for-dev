@@ -20,16 +20,17 @@ load_dotenv(PROJECT_ROOT / ".env")
 # Import metadata and DB config from the app
 from db.base import Base  # noqa: E402
 from db import models as _models  # noqa: F401, E402  # ensure models are imported
-from db.config import get_database_url  # noqa: E402
+from db.config import _normalize_sqlalchemy_url, get_database_url  # noqa: E402
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
-# If DATABASE_URL is set, prefer it over the value in alembic.ini
+# If DATABASE_URL is set, prefer it over the value in alembic.ini.
+# Нормализуем postgres:// → postgresql+psycopg:// как в db.config (managed-провайдеры).
 database_url = os.getenv("DATABASE_URL")
 if database_url:
-  config.set_main_option("sqlalchemy.url", database_url)
+  config.set_main_option("sqlalchemy.url", _normalize_sqlalchemy_url(database_url))
 else:
   # Fallback to application DB config (will raise if env is not configured)
   config.set_main_option("sqlalchemy.url", get_database_url("postgresql+psycopg://postgres:postgres@localhost:5432/postgres"))
