@@ -1,3 +1,5 @@
+"""Module for db/repositories/user repo."""
+
 from __future__ import annotations
 
 from typing import Optional

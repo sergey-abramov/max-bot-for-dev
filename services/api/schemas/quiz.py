@@ -1,3 +1,5 @@
+"""Module for services/api/schemas/quiz."""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -7,6 +9,7 @@ from pydantic import BaseModel
 
 
 class UserSyncPayload(BaseModel):
+  """Represent usersyncpayload."""
   telegram_id: int
   username: Optional[str] = None
   first_name: Optional[str] = None
@@ -14,6 +17,7 @@ class UserSyncPayload(BaseModel):
 
 
 class TopicOut(BaseModel):
+  """Represent topicout."""
   id: int
   slug: str
   title: str
@@ -21,6 +25,7 @@ class TopicOut(BaseModel):
 
 
 class QuestionOut(BaseModel):
+  """Represent questionout."""
   id: int
   topic_id: int
   topic_slug: str
@@ -30,6 +35,7 @@ class QuestionOut(BaseModel):
 
 
 class TopicStatsOut(BaseModel):
+  """Represent topicstatsout."""
   topic_id: int
   topic_slug: str
   correct_count: int
@@ -39,6 +45,7 @@ class TopicStatsOut(BaseModel):
 
 
 class SubmitAnswerPayload(BaseModel):
+  """Represent submitanswerpayload."""
   telegram_id: int
   question_id: int
   selected_key: Optional[str] = None
@@ -48,6 +55,7 @@ class SubmitAnswerPayload(BaseModel):
 
 
 class AnswerResultOut(BaseModel):
+  """Represent answerresultout."""
   is_correct: bool
   correct_key: Optional[str] = None
   question: QuestionOut

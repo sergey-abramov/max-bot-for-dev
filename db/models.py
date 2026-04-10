@@ -1,3 +1,5 @@
+"""Module for db/models."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -10,6 +12,7 @@ from .base import Base
 
 
 class User(Base):
+  """Represent user."""
   __tablename__ = "user"
 
   id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -41,6 +44,7 @@ class User(Base):
 
 
 class Topic(Base):
+  """Represent topic."""
   __tablename__ = "topic"
 
   id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -56,6 +60,7 @@ class Topic(Base):
 
 
 class Question(Base):
+  """Represent question."""
   __tablename__ = "question"
 
   id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -77,6 +82,7 @@ class Question(Base):
 
 
 class UserQuestionStat(Base):
+  """Represent userquestionstat."""
   __tablename__ = "user_question_stat"
 
   id: Mapped[int] = mapped_column(BigInteger, primary_key=True)

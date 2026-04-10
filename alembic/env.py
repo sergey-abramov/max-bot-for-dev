@@ -1,3 +1,5 @@
+"""Module for alembic/env."""
+
 from __future__ import annotations
 
 import os

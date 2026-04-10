@@ -1,3 +1,5 @@
+"""Module for services/stt/app."""
+
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
 import uvicorn
@@ -27,6 +29,7 @@ else:
 
 @app.post("/transcribe")
 async def transcribe(file: UploadFile = File(...)):
+    """Perform transcribe."""
     if model is None:
         raise HTTPException(
             status_code=503,

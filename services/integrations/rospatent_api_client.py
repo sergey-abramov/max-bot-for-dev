@@ -1,3 +1,5 @@
+"""Module for services/integrations/rospatent api client."""
+
 from __future__ import annotations
 
 import html
@@ -29,6 +31,7 @@ class RosPatentUnavailableError(RosPatentClientError):
 
 @dataclass(frozen=True, slots=True)
 class RosPatentHit:
+  """Represent rospatenthit."""
   id: str
   title: str
   description: str
@@ -40,6 +43,7 @@ class RosPatentHit:
 
 
 class RosPatentApiClient:
+  """Client for rospatentapi integration."""
   def __init__(
     self,
     api_key: str,
@@ -47,16 +51,19 @@ class RosPatentApiClient:
     base_url: str = "https://searchplatform.rospatent.gov.ru",
     timeout: float = 120.0,
   ) -> None:
+    """Initialize RosPatent API client settings and credentials."""
     self._api_key = api_key.strip()
     self._base_url = base_url.rstrip("/")
     self._timeout = timeout
 
   def _headers(self) -> dict[str, str]:
+    """Return authorization headers for API requests."""
     if not self._api_key:
       return {}
     return {"Authorization": f"Bearer {self._api_key}"}
 
   def _normalize_hit(self, raw_hit: Any) -> RosPatentHit | None:
+    """Convert raw RosPatent hit payload into normalized dataclass."""
     if not isinstance(raw_hit, dict):
       return None
 
@@ -105,6 +112,7 @@ class RosPatentApiClient:
     )
 
   async def similar_text_search(self, query: str, *, count: int = 5) -> list[RosPatentHit]:
+    """Run RosPatent text search and return normalized hit list."""
     url = f"{self._base_url}/patsearch/v0.2/search"
     safe_count = max(int(count), 0)
     payload = {
@@ -157,6 +165,7 @@ class RosPatentApiClient:
     return normalized[:safe_count]
 
   def _log_hit_schema(self, hits: list[Any]) -> None:
+    """Log shape of sample hits to help inspect API schema."""
     sample_limit = 2
     for idx, hit in enumerate(hits[:sample_limit], start=1):
       if not isinstance(hit, dict):
@@ -186,6 +195,7 @@ class RosPatentApiClient:
 
   @staticmethod
   def _extract_error_details(response: httpx.Response) -> str:
+    """Extract readable error details from RosPatent response payload."""
     try:
       payload = response.json()
     except ValueError:
@@ -203,6 +213,7 @@ class RosPatentApiClient:
 
   @staticmethod
   def _normalize_markup_text(value: str) -> str:
+    """Strip HTML markup and unescape entities in API text fields."""
     if not value:
       return ""
     # API returns <em> for search highlights; MAX shows markdown literally, so keep inner text only.
@@ -212,6 +223,7 @@ class RosPatentApiClient:
 
   @staticmethod
   def _stringify(value: Any) -> str:
+    """Convert unknown value types to compact human-readable text."""
     if value is None:
       return ""
     if isinstance(value, str):
@@ -230,6 +242,7 @@ class RosPatentApiClient:
 
   @staticmethod
   def _extract_text_field(source: dict[str, Any], keys: tuple[str, ...]) -> str:
+    """Return first non-empty normalized value for provided keys."""
     for key in keys:
       value = RosPatentApiClient._stringify(source.get(key))
       if value:
@@ -259,6 +272,7 @@ class RosPatentApiClient:
 
   @staticmethod
   def _first_non_empty(*values: str) -> str:
+    """Return the first non-empty string value."""
     for value in values:
       if value and value.strip():
         return value.strip()
@@ -266,6 +280,7 @@ class RosPatentApiClient:
 
   @staticmethod
   def _format_document_line(common: dict[str, Any], fallback_id: str) -> str:
+    """Build readable document identifier line from common fields."""
     office = RosPatentApiClient._stringify(common.get("publishing_office"))
     number = RosPatentApiClient._stringify(common.get("document_number"))
     kind = RosPatentApiClient._stringify(common.get("kind"))
@@ -279,6 +294,7 @@ class RosPatentApiClient:
 
   @staticmethod
   def _extract_publication_date(common: dict[str, Any], biblio_merged: dict[str, Any]) -> str:
+    """Extract publication date from common or merged biblio fields."""
     from_common = RosPatentApiClient._stringify(common.get("publication_date"))
     if from_common:
       return from_common
@@ -296,6 +312,7 @@ class RosPatentApiClient:
 
   @staticmethod
   def _ipc_from_classification(classification: Any) -> str:
+    """Extract IPC code string from classification payload."""
     if classification is None:
       return ""
     if isinstance(classification, str):

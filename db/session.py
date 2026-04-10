@@ -1,3 +1,5 @@
+"""Module for db/session."""
+
 from contextlib import contextmanager
 from typing import Iterator
 

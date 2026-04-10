@@ -1,3 +1,5 @@
+"""Module for db/  init  ."""
+
 from .base import Base
 from .config import create_engine_from_env, get_database_url, get_engine
 from .models import Question, Topic, User, UserQuestionStat

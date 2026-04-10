@@ -1,3 +1,5 @@
+"""Module for services/api/routers/quiz."""
+
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
@@ -19,6 +21,7 @@ router = APIRouter()
 
 
 def _user_to_dict(user) -> Dict[str, Any]:
+  """Perform user to dict."""
   return {
     "id": user.id,
     "telegram_id": user.telegram_id,
@@ -32,6 +35,7 @@ def _user_to_dict(user) -> Dict[str, Any]:
 
 @router.post("/users/sync")
 def sync_user(payload: UserSyncPayload) -> Dict[str, Any]:
+  """Perform sync user."""
   with get_session() as session:
     user = quiz_service.register_or_update_user(
       session=session,
@@ -45,6 +49,7 @@ def sync_user(payload: UserSyncPayload) -> Dict[str, Any]:
 
 @router.get("/topics", response_model=List[TopicOut])
 def list_topics() -> List[TopicOut]:
+  """Return topics."""
   with get_session() as session:
     topics = quiz_service.list_active_topics(session=session)
     return [
@@ -60,6 +65,7 @@ def list_topics() -> List[TopicOut]:
 
 @router.get("/topics/{slug}/random-question", response_model=QuestionOut)
 def get_random_question(slug: str, difficulty: Optional[int] = None) -> QuestionOut:
+  """Return random question."""
   with get_session() as session:
     topic = quiz_service.get_topic_by_slug(session=session, slug=slug)
     if topic is None or not topic.is_active:
@@ -86,6 +92,7 @@ def get_random_question(slug: str, difficulty: Optional[int] = None) -> Question
 
 @router.post("/answers/submit", response_model=AnswerResultOut)
 def submit_answer(payload: SubmitAnswerPayload) -> AnswerResultOut:
+  """Submit answer."""
   with get_session() as session:
     result = quiz_service.submit_answer(
       session=session,

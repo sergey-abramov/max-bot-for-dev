@@ -1,3 +1,5 @@
+"""Module for services/application/max handlers/message callback."""
+
 from __future__ import annotations
 
 import logging
@@ -27,6 +29,7 @@ DB_UNAVAILABLE_MESSAGE = (
 
 
 def _build_question_text(question: Any, index: int, total_planned: int) -> str:
+  """Return question text."""
   header = f"Вопрос {index + 1} из {total_planned}\n{question.text}\n"
   options = question.options or {}
   rows = [f"{key}. {value}" for key, value in sorted(options.items(), key=lambda item: item[0])]
@@ -34,6 +37,7 @@ def _build_question_text(question: Any, index: int, total_planned: int) -> str:
 
 
 def _build_topic_attachments(topics: list[Any]) -> list[dict[str, Any]]:
+  """Return topic attachments."""
   buttons = []
   for topic in topics:
     buttons.append([{"type": "callback", "text": topic.title, "payload": f"victorine:topic:{topic.slug}"}])
@@ -41,6 +45,7 @@ def _build_topic_attachments(topics: list[Any]) -> list[dict[str, Any]]:
 
 
 def _build_answer_attachments(topic_slug: str, question_id: int, options: dict[str, str] | None) -> list[dict[str, Any]]:
+  """Return answer attachments."""
   keys = sorted((options or {}).keys())
   row = [
     {"type": "callback", "text": key, "payload": f"victorine:answer:{topic_slug}:{question_id}:{key}"}
@@ -50,6 +55,7 @@ def _build_answer_attachments(topic_slug: str, question_id: int, options: dict[s
 
 
 async def handle_message_callback(update: dict[str, Any], max_api_client: MaxApiClient) -> None:
+  """Handle message callback."""
   logger.info("MAX webhook: message_callback handled", extra={"update": update})
   payload = extract_callback_payload(update)
   if not payload:

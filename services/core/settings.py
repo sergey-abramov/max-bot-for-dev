@@ -1,3 +1,5 @@
+"""Module for services/core/settings."""
+
 from __future__ import annotations
 
 import os
@@ -11,6 +13,7 @@ load_dotenv()
 
 @dataclass(frozen=True, slots=True)
 class Settings:
+  """Represent settings."""
   max_webhook_path: str = "/webhooks/max"
   public_base_url: str = ""
   max_webhook_autosubscribe: bool = False
@@ -27,9 +30,11 @@ class Settings:
   app_env: str = "development"
 
   def is_production(self) -> bool:
+    """Return whether is production."""
     return self.app_env == "production"
 
   def validate_webhook_runtime(self) -> None:
+    """Validate webhook runtime."""
     if self.max_bot_mode != "webhook":
       raise ValueError(
         f"Unsupported MAX_BOT_MODE={self.max_bot_mode!r}. "
@@ -37,6 +42,7 @@ class Settings:
       )
 
   def webhook_public_url(self) -> str:
+    """Perform webhook public url."""
     base = self.public_base_url.strip().rstrip("/")
     if not base:
       return ""
@@ -44,6 +50,7 @@ class Settings:
 
 
 def get_settings() -> Settings:
+  """Return settings."""
   app_env = (
     os.getenv("APP_ENV")
     or os.getenv("VERCEL_ENV")

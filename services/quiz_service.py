@@ -1,3 +1,5 @@
+"""Module for services/quiz service."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -110,6 +112,7 @@ def _ensure_question_exists(
   session: Session,
   question_id: int,
 ) -> Question:
+  """Perform ensure question exists."""
   question = question_repo.get_question_by_id(session=session, question_id=question_id)
   if question is None:
     msg = f"Question with id={question_id} not found"

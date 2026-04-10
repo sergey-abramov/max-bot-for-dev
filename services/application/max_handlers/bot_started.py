@@ -1,3 +1,5 @@
+"""Module for services/application/max handlers/bot started."""
+
 from __future__ import annotations
 
 import logging
@@ -10,5 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 async def handle_bot_started(update: dict[str, Any], max_api_client: MaxApiClient) -> None:
+  """Handle bot started."""
   logger.info("MAX webhook: bot_started handled", extra={"update": update})
   await send_text(max_api_client, update, "Привет! Я запущен и готов помочь. Напишите /start.")

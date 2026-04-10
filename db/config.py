@@ -1,3 +1,5 @@
+"""Module for db/config."""
+
 import os
 from pathlib import Path
 from typing import Optional

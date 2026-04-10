@@ -1,3 +1,5 @@
+"""Module for services/integrations/max api client."""
+
 from __future__ import annotations
 
 import logging
@@ -8,17 +10,21 @@ logger = logging.getLogger(__name__)
 
 
 class MaxApiClient:
+  """Client for maxapi integration."""
   def __init__(self, bot_token: str, base_url: str = "https://platform-api.max.ru") -> None:
+    """Initialize the instance."""
     self._bot_token = bot_token
     self._base_url = base_url.rstrip("/")
 
   def _headers(self) -> dict[str, str]:
+    """Perform headers."""
     if not self._bot_token:
       return {}
     # MAX API expects Authorization header without forcing Bearer scheme.
     return {"Authorization": self._bot_token.strip()}
 
   async def post(self, path: str, payload: dict) -> dict:
+    """Perform post."""
     url = f"{self._base_url}/{path.lstrip('/')}"
     logger.info("MAX integration request: method=POST url=%s body=%s", url, payload)
     async with httpx.AsyncClient(timeout=10.0) as client:
@@ -34,6 +40,7 @@ class MaxApiClient:
       return response_payload
 
   async def get(self, path: str) -> dict:
+    """Return result."""
     url = f"{self._base_url}/{path.lstrip('/')}"
     logger.info("MAX integration request: method=GET url=%s", url)
     async with httpx.AsyncClient(timeout=10.0) as client:
@@ -49,11 +56,13 @@ class MaxApiClient:
       return response_payload
 
   async def list_subscriptions(self) -> list[dict]:
+    """Return subscriptions."""
     payload = await self.get("/subscriptions")
     subscriptions = payload.get("subscriptions")
     return subscriptions if isinstance(subscriptions, list) else []
 
   async def create_subscription(self, *, url: str, update_types: list[str] | None = None) -> dict:
+    """Return subscription."""
     body: dict[str, object] = {"url": url}
     if update_types:
       body["update_types"] = update_types
@@ -65,6 +74,7 @@ class MaxApiClient:
     url: str,
     update_types: list[str] | None = None,
   ) -> dict:
+    """Perform ensure webhook subscription."""
     subscriptions = await self.list_subscriptions()
     for item in subscriptions:
       if str(item.get("url") or "").strip() == url:

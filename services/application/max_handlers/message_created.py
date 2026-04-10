@@ -1,3 +1,5 @@
+"""Module for services/application/max handlers/message created."""
+
 from __future__ import annotations
 
 import logging
@@ -38,10 +40,12 @@ logger = logging.getLogger(__name__)
 
 
 def _build_start_menu() -> str:
+  """Return the default text shown in the main bot menu."""
   return "Добро пожаловать! Выберите действие:"
 
 
 def _build_main_menu_attachments() -> list[dict[str, Any]]:
+  """Build inline keyboard attachments for the main menu actions."""
   return [
     {
       "type": "inline_keyboard",
@@ -62,10 +66,12 @@ def _build_main_menu_attachments() -> list[dict[str, Any]]:
 
 
 def _normalize_query(text: str) -> str:
+  """Normalize user input by collapsing whitespace and trimming."""
   return " ".join((text or "").split()).strip()
 
 
 def _is_valid_patent_query(text: str) -> bool:
+  """Validate that a patent query is meaningful for search."""
   normalized = _normalize_query(text)
   if len(normalized) < 3:
     return False
@@ -82,6 +88,7 @@ def _is_valid_patent_query(text: str) -> bool:
 
 
 def _truncate(value: str, *, max_len: int = 300) -> str:
+  """Trim long text to max_len and append ellipsis when needed."""
   text = _normalize_query(value)
   if len(text) <= max_len:
     return text
@@ -89,6 +96,7 @@ def _truncate(value: str, *, max_len: int = 300) -> str:
 
 
 def _build_patent_card_text(idx: int, hit: Any) -> str:
+  """Format a single patent hit into a user-facing card text."""
   title = _truncate(hit.title or f"Патент #{hit.id}", max_len=120)
   description = _truncate(hit.description or "Описание отсутствует.", max_len=300)
 
@@ -110,22 +118,25 @@ def _build_patent_card_text(idx: int, hit: Any) -> str:
   return "\n".join(header_lines) + f"\n\n{description}"
 
 
-def _build_patent_public_url(patent_id: str) -> str:
-  return f"https://searchplatform.rospatent.gov.ru/patsearch?query={quote_plus(patent_id)}"
+def _build_patent_public_url(query: str) -> str:
+  """Build public RosPatent search URL for a given query string."""
+  return f"https://searchplatform.rospatent.gov.ru/patsearch?query={quote_plus(query)}"
 
 
-def _build_patent_attachments(patent_id: str) -> list[dict[str, Any]]:
+def _build_patent_attachments(query: str) -> list[dict[str, Any]]:
+  """Create inline link attachment that opens RosPatent search page."""
   return [
     {
       "type": "inline_keyboard",
       "payload": {
-        "buttons": [[{"type": "link", "text": "Открыть патент", "url": _build_patent_public_url(patent_id)}]]
+        "buttons": [[{"type": "link", "text": "Открыть патент", "url": _build_patent_public_url(query)}]]
       },
     }
   ]
 
 
 async def _send_main_menu(update: dict[str, Any], max_api_client: MaxApiClient) -> None:
+  """Send the main action menu to the current user."""
   await send_message(
     max_api_client,
     update,
@@ -135,6 +146,7 @@ async def _send_main_menu(update: dict[str, Any], max_api_client: MaxApiClient) 
 
 
 def _build_question_text(question: Any, index: int, total_planned: int) -> str:
+  """Render quiz question text with numbered answer options."""
   header = f"Вопрос {index + 1} из {total_planned}\n{question.text}\n"
   options = question.options or {}
   rows = [f"{key}. {value}" for key, value in sorted(options.items(), key=lambda item: item[0])]
@@ -142,6 +154,7 @@ def _build_question_text(question: Any, index: int, total_planned: int) -> str:
 
 
 async def _call_openrouter(question: str, api_key: str, model: str) -> str:
+  """Call OpenRouter chat completions API and return assistant reply."""
   if not api_key:
     return "OPENROUTER_API_KEY не настроен."
   async with httpx.AsyncClient(timeout=30.0) as client:
@@ -162,6 +175,7 @@ async def _call_openrouter(question: str, api_key: str, model: str) -> str:
 
 
 async def _start_quiz(update: dict[str, Any], max_api_client: MaxApiClient, user_id: str) -> None:
+  """Initialize quiz session and send the first question."""
   with get_session() as session:
     topics = quiz_service.list_active_topics(session=session)
     if not topics:
@@ -185,6 +199,7 @@ async def _start_quiz(update: dict[str, Any], max_api_client: MaxApiClient, user
 
 
 async def handle_message_created(update: dict[str, Any], max_api_client: MaxApiClient) -> None:
+  """Handle incoming MAX message updates and route bot commands."""
   logger.info("MAX webhook: message_created handled", extra={"update": update})
 
   text = extract_message_text(update)
@@ -356,11 +371,12 @@ async def handle_message_created(update: dict[str, Any], max_api_client: MaxApiC
       return
 
     for idx, hit in enumerate(hits[:5], start=1):
+      link_query = _normalize_query(hit.document or hit.id)
       await send_message(
         max_api_client,
         update,
         text=_build_patent_card_text(idx, hit),
-        attachments=_build_patent_attachments(hit.id),
+        attachments=_build_patent_attachments(link_query),
       )
 
     await _send_main_menu(update, max_api_client)

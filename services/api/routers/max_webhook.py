@@ -1,3 +1,5 @@
+"""Module for services/api/routers/max webhook."""
+
 from __future__ import annotations
 
 import logging
@@ -20,6 +22,7 @@ _DEDUP_TTL_SECONDS = 300
 
 
 def _extract_event_id(payload: dict) -> Optional[str]:
+  """Extract event id."""
   event_id = payload.get("update_id") or payload.get("event_id")
   if event_id is None:
     return None
@@ -28,6 +31,7 @@ def _extract_event_id(payload: dict) -> Optional[str]:
 
 
 def _is_duplicate(event_id: str) -> bool:
+  """Return whether is duplicate."""
   now = time.time()
   with _SEEN_LOCK:
     # Compact stale keys on write path to keep memory bounded.
@@ -46,6 +50,7 @@ def _is_duplicate(event_id: str) -> bool:
 async def receive_webhook(
   request: Request,
 ) -> dict:
+  """Perform receive webhook."""
   settings: Settings = request.app.state.settings
   dispatcher: MaxEventDispatcher = request.app.state.max_event_dispatcher
 

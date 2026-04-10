@@ -1,3 +1,5 @@
+"""Module for tests/test topic and question repos."""
+
 from __future__ import annotations
 
 from db.repositories.question_repo import (
@@ -14,6 +16,7 @@ from db.seed import seed_initial_data
 
 
 def test_get_active_topics_and_by_slug(db_session) -> None:
+  """Test get active topics and by slug."""
   seed_initial_data()
 
   topics = get_active_topics(db_session)
@@ -32,6 +35,7 @@ def test_get_active_topics_and_by_slug(db_session) -> None:
 
 
 def test_questions_by_topic_and_random_question(db_session) -> None:
+  """Test questions by topic and random question."""
   seed_initial_data()
 
   topic = get_topic_by_slug(db_session, "python-basics")

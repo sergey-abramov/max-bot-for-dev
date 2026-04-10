@@ -1,3 +1,5 @@
+"""Module for tests/test user repo."""
+
 from __future__ import annotations
 
 from db.models import User
@@ -9,6 +11,7 @@ from db.repositories.user_repo import (
 
 
 def test_get_or_create_user_creates_new_user(db_session) -> None:
+  """Test get or create user creates new user."""
   telegram_id = 123456789
 
   user = get_or_create_user(
@@ -39,6 +42,7 @@ def test_get_or_create_user_creates_new_user(db_session) -> None:
 
 
 def test_get_or_create_user_updates_existing(db_session) -> None:
+  """Test get or create user updates existing."""
   telegram_id = 987654321
 
   first = get_or_create_user(

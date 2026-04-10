@@ -1,3 +1,5 @@
+"""Module for services/api/app."""
+
 from __future__ import annotations
 
 import logging
@@ -14,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
+  """Return app."""
   resolved_settings = settings or get_settings()
   resolved_settings.validate_webhook_runtime()
   app = FastAPI(title="Quiz Service API", version="1.0.0")
@@ -24,6 +27,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
   @app.on_event("startup")
   async def _register_webhook_subscription() -> None:
+    """Perform register webhook subscription."""
     if not resolved_settings.is_production():
       return
     if not resolved_settings.max_webhook_autosubscribe:

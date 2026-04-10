@@ -1,3 +1,5 @@
+"""Module for tests/conftest."""
+
 from __future__ import annotations
 
 import os
@@ -31,6 +33,7 @@ def _build_engine() -> Engine:
 
 @pytest.fixture(scope="session")
 def engine() -> Generator[Engine, None, None]:
+  """Perform engine."""
   engine = _build_engine()
 
   # Полностью пересоздаем схему для чистого состояния тестовой БД.

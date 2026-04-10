@@ -1,3 +1,5 @@
+"""Module for services/application/max event dispatcher."""
+
 from __future__ import annotations
 
 import logging
@@ -15,7 +17,9 @@ Handler = Callable[[dict[str, Any], MaxApiClient], Awaitable[None]]
 
 
 class MaxEventDispatcher:
+  """Represent maxeventdispatcher."""
   def __init__(self, max_api_client: MaxApiClient) -> None:
+    """Initialize the instance."""
     self._max_api_client = max_api_client
     self._handlers: dict[str, Handler] = {
       "bot_started": handle_bot_started,
@@ -24,6 +28,7 @@ class MaxEventDispatcher:
     }
 
   async def dispatch(self, update: dict[str, Any]) -> None:
+    """Perform dispatch."""
     update_type = str(update.get("update_type") or "").strip()
     if not update_type:
       logger.warning("MAX webhook: update_type is empty")

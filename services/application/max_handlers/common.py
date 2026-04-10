@@ -1,3 +1,5 @@
+"""Module for services/application/max handlers/common."""
+
 from __future__ import annotations
 
 import json
@@ -11,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def extract_reply_target(update: dict[str, Any]) -> dict[str, str]:
+  """Extract reply target."""
   payload = update.get("payload") or {}
   message = payload.get("message") or update.get("message") or {}
   recipient = message.get("recipient") or payload.get("recipient") or {}
@@ -50,6 +53,7 @@ def extract_reply_target(update: dict[str, Any]) -> dict[str, str]:
 
 
 def extract_user(update: dict[str, Any]) -> dict[str, Any]:
+  """Extract user."""
   payload = update.get("payload") or {}
   message = payload.get("message") or update.get("message") or {}
   callback = payload.get("callback") or update.get("callback") or {}
@@ -70,6 +74,7 @@ def extract_user(update: dict[str, Any]) -> dict[str, Any]:
 
 
 def extract_user_id(update: dict[str, Any]) -> str:
+  """Extract user id."""
   payload = update.get("payload") or {}
   message = payload.get("message") or update.get("message") or {}
   body = message.get("body") or {}
@@ -100,6 +105,7 @@ def extract_user_id(update: dict[str, Any]) -> str:
 
 
 def extract_message_text(update: dict[str, Any]) -> str:
+  """Extract message text."""
   payload = update.get("payload") or {}
   message = payload.get("message") or update.get("message") or {}
   body = message.get("body") or {}
@@ -108,6 +114,7 @@ def extract_message_text(update: dict[str, Any]) -> str:
 
 
 def extract_callback_payload(update: dict[str, Any]) -> str:
+  """Extract callback payload."""
   payload = update.get("payload") or {}
   message = update.get("message") or {}
   callback = payload.get("callback") or update.get("callback") or {}
@@ -131,6 +138,7 @@ def extract_callback_payload(update: dict[str, Any]) -> str:
 
 
 def dump_identity(update: dict[str, Any]) -> str:
+  """Perform dump identity."""
   user = extract_user(update)
   target = extract_reply_target(update)
   return (
@@ -142,6 +150,7 @@ def dump_identity(update: dict[str, Any]) -> str:
 
 
 async def send_text(max_api_client: MaxApiClient, update: dict[str, Any], text: str) -> None:
+  """Send text."""
   await send_message(max_api_client, update, text=text)
 
 
@@ -152,6 +161,7 @@ async def send_message(
   text: str,
   attachments: list[dict[str, Any]] | None = None,
 ) -> None:
+  """Send message."""
   target = extract_reply_target(update)
   if not target:
     logger.warning("MAX webhook: reply target missing, cannot send message", extra={"update": update})

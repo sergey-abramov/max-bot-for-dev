@@ -1,3 +1,5 @@
+"""Module for db/repositories/stat repo."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -12,6 +14,7 @@ from db.models import Question, Topic, UserQuestionStat
 
 @dataclass(slots=True)
 class TopicStats:
+  """Represent topicstats."""
   topic: Topic
   correct_count: int
   wrong_count: int
@@ -19,6 +22,7 @@ class TopicStats:
 
   @property
   def total_answers(self) -> int:
+    """Perform total answers."""
     return self.correct_count + self.wrong_count
 
 

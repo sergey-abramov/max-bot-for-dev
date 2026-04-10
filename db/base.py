@@ -1,3 +1,5 @@
+"""Module for db/base."""
+
 from sqlalchemy.orm import DeclarativeBase
 
 

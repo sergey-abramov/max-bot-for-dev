@@ -1,3 +1,5 @@
+"""Module for tests/test stat repo."""
+
 from __future__ import annotations
 
 from db.repositories.question_repo import get_questions_by_topic
@@ -8,6 +10,7 @@ from db.seed import seed_initial_data
 
 
 def test_record_user_answer_and_topic_stats(db_session) -> None:
+  """Test record user answer and topic stats."""
   seed_initial_data()
 
   user = get_or_create_user(

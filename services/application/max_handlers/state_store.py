@@ -1,3 +1,5 @@
+"""Module for services/application/max handlers/state store."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -5,6 +7,7 @@ from dataclasses import dataclass
 
 @dataclass(slots=True)
 class QuizSession:
+  """Store state for quiz."""
   topic_slug: str
   topic_title: str
   current_question_id: int

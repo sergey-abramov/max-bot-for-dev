@@ -1,3 +1,5 @@
+"""Module for db/repositories/  init  ."""
+
 from . import question_repo, stat_repo, topic_repo, user_repo
 
 __all__ = [

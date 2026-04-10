@@ -1,3 +1,5 @@
+"""Module for services/quiz api."""
+
 from __future__ import annotations
 
 from services.api.app import create_app

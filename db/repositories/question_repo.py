@@ -1,3 +1,5 @@
+"""Module for db/repositories/question repo."""
+
 from __future__ import annotations
 
 from typing import List, Optional
@@ -9,6 +11,7 @@ from db.models import Question
 
 
 def _base_active_question_query() -> Select[tuple[Question]]:
+  """Perform base active question query."""
   return select(Question).where(Question.is_active.is_(True))
 
 
