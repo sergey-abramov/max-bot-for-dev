@@ -65,25 +65,30 @@ class RosPatentApiClient:
       return None
 
     hit_id = str(raw_hit.get("id") or "").strip()
-    biblio = raw_hit.get("biblio")
-    biblio_ru = biblio.get("ru", {}) if isinstance(biblio, dict) else {}
-    title = self._normalize_markup_text(str(snippet.get("title") or biblio_ru.get("title") or "").strip())
+    common = raw_hit.get("common")
+    common_dict = common if isinstance(common, dict) else {}
+    biblio_merged = self._merge_biblio_locales(raw_hit.get("biblio"))
+
+    title_src = str(snippet.get("title") or biblio_merged.get("title") or "").strip()
+    title = self._normalize_markup_text(title_src)
     description = self._normalize_markup_text(str(snippet.get("description") or "").strip())
-    document = self._extract_document_info(raw_hit, biblio_ru, hit_id)
-    publication_date = self._extract_text_field(
-      biblio_ru,
-      (
-        "publication_date",
-        "publishing_date",
-        "published_at",
-        "date_publish",
-        "pub_date",
-        "date",
-      ),
+
+    document = self._format_document_line(common_dict, hit_id)
+    publication_date = self._extract_publication_date(common_dict, biblio_merged)
+
+    applicant = self._first_non_empty(
+      self._normalize_markup_text(self._stringify(snippet.get("applicant"))),
+      self._extract_text_field(biblio_merged, ("applicant", "applicants", "holder", "holders", "patentee")),
     )
-    applicant = self._extract_text_field(biblio_ru, ("applicant", "applicants", "holder", "holders"))
-    author = self._extract_text_field(biblio_ru, ("author", "authors", "inventor", "inventors"))
-    ipc = self._extract_text_field(biblio_ru, ("ipc", "ipc_index", "mki", "mpk", "classification"))
+    author = self._first_non_empty(
+      self._normalize_markup_text(self._stringify(snippet.get("inventor"))),
+      self._extract_text_field(biblio_merged, ("inventor", "inventors", "author", "authors")),
+    )
+    ipc = self._first_non_empty(
+      self._ipc_from_classification(snippet.get("classification")),
+      self._ipc_from_classification(common_dict.get("classification")),
+      self._extract_text_field(biblio_merged, ("ipc", "ipc_index", "mki", "mpk", "classification")),
+    )
 
     if not hit_id and not title and not description:
       return None
@@ -159,15 +164,22 @@ class RosPatentApiClient:
         continue
 
       biblio = hit.get("biblio")
-      biblio_ru = biblio.get("ru", {}) if isinstance(biblio, dict) and isinstance(biblio.get("ru"), dict) else {}
+      biblio_locales: list[str] = []
+      if isinstance(biblio, dict):
+        for loc, block in biblio.items():
+          if isinstance(block, dict) and block:
+            biblio_locales.append(f"{loc}:{sorted(block.keys())}")
       snippet = hit.get("snippet")
       snippet_dict = snippet if isinstance(snippet, dict) else {}
+      common = hit.get("common")
+      common_keys = sorted(common.keys()) if isinstance(common, dict) else []
 
       logger.info(
-        "RosPatent hit schema sample #%s: top_keys=%s biblio_ru_keys=%s snippet_keys=%s id=%s",
+        "RosPatent hit schema sample #%s: top_keys=%s common_keys=%s biblio_locales=%s snippet_keys=%s id=%s",
         idx,
         sorted(hit.keys()),
-        sorted(biblio_ru.keys()),
+        common_keys,
+        biblio_locales,
         sorted(snippet_dict.keys()),
         str(hit.get("id") or ""),
       )
@@ -193,8 +205,8 @@ class RosPatentApiClient:
   def _normalize_markup_text(value: str) -> str:
     if not value:
       return ""
-    # RosPatent uses <em> for highlights; MAX markdown supports ***text*** better.
-    text = re.sub(r"(?is)<\s*em\s*>(.*?)<\s*/\s*em\s*>", r"***\1***", value)
+    # API returns <em> for search highlights; MAX shows markdown literally, so keep inner text only.
+    text = re.sub(r"(?is)<\s*em\s*>(.*?)<\s*/\s*em\s*>", r"\1", value)
     text = re.sub(r"(?is)<[^>]+>", "", text)
     return html.unescape(text).strip()
 
@@ -225,21 +237,82 @@ class RosPatentApiClient:
     return ""
 
   @staticmethod
-  def _extract_document_info(raw_hit: dict[str, Any], biblio_ru: dict[str, Any], fallback_id: str) -> str:
-    document = RosPatentApiClient._extract_text_field(
-      biblio_ru,
-      ("document", "doc_number", "document_number", "publication_number", "patent_number", "number"),
+  def _merge_biblio_locales(biblio: Any) -> dict[str, Any]:
+    """Flatten biblio.{ru,en,ko,...} into one dict; later keys do not override non-empty earlier values."""
+    if not isinstance(biblio, dict):
+      return {}
+    priority = ("ru", "en")
+    merged: dict[str, Any] = {}
+    for loc in priority:
+      block = biblio.get(loc)
+      if isinstance(block, dict):
+        for key, val in block.items():
+          if key not in merged or not RosPatentApiClient._stringify(merged.get(key)):
+            merged[key] = val
+    for loc, block in biblio.items():
+      if loc in priority or not isinstance(block, dict):
+        continue
+      for key, val in block.items():
+        if key not in merged or not RosPatentApiClient._stringify(merged.get(key)):
+          merged[key] = val
+    return merged
+
+  @staticmethod
+  def _first_non_empty(*values: str) -> str:
+    for value in values:
+      if value and value.strip():
+        return value.strip()
+    return ""
+
+  @staticmethod
+  def _format_document_line(common: dict[str, Any], fallback_id: str) -> str:
+    office = RosPatentApiClient._stringify(common.get("publishing_office"))
+    number = RosPatentApiClient._stringify(common.get("document_number"))
+    kind = RosPatentApiClient._stringify(common.get("kind"))
+    if office and number and kind:
+      return f"{office} {number} {kind}".strip()
+    if office and number:
+      return f"{office} {number}".strip()
+    if number and kind:
+      return f"{number} {kind}".strip()
+    return fallback_id
+
+  @staticmethod
+  def _extract_publication_date(common: dict[str, Any], biblio_merged: dict[str, Any]) -> str:
+    from_common = RosPatentApiClient._stringify(common.get("publication_date"))
+    if from_common:
+      return from_common
+    return RosPatentApiClient._extract_text_field(
+      biblio_merged,
+      (
+        "publication_date",
+        "publishing_date",
+        "published_at",
+        "date_publish",
+        "pub_date",
+        "date",
+      ),
     )
-    kind = RosPatentApiClient._extract_text_field(biblio_ru, ("kind", "kind_code", "document_kind"))
-    country = RosPatentApiClient._extract_text_field(biblio_ru, ("country", "country_code", "office"))
 
-    if not document:
-      # A few payloads include document marker outside biblio.ru.
-      document = RosPatentApiClient._extract_text_field(
-        raw_hit,
-        ("document", "doc_number", "document_number", "publication_number", "patent_number"),
-      )
-    if not document:
-      document = fallback_id
-
-    return " ".join(part for part in (country, document, kind) if part).strip()
+  @staticmethod
+  def _ipc_from_classification(classification: Any) -> str:
+    if classification is None:
+      return ""
+    if isinstance(classification, str):
+      return RosPatentApiClient._normalize_markup_text(classification.strip())
+    if not isinstance(classification, dict):
+      return ""
+    ipc_raw = classification.get("ipc")
+    if isinstance(ipc_raw, str) and ipc_raw.strip():
+      return RosPatentApiClient._normalize_markup_text(ipc_raw.strip())
+    if isinstance(ipc_raw, list):
+      codes: list[str] = []
+      for item in ipc_raw:
+        if isinstance(item, dict):
+          fullname = RosPatentApiClient._stringify(item.get("fullname"))
+          if fullname:
+            codes.append(fullname)
+        elif isinstance(item, str) and item.strip():
+          codes.append(item.strip())
+      return RosPatentApiClient._normalize_markup_text(", ".join(codes))
+    return ""

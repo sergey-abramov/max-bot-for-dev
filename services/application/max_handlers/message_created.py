@@ -96,10 +96,10 @@ def _build_patent_card_text(idx: int, hit: Any) -> str:
   if hit.ipc:
     header_lines.append(f"МПК: {hit.ipc}")
   if hit.document:
-    document_line = f"Документ: {hit.document}"
     if hit.publication_date:
-      document_line = f"{document_line} ({hit.publication_date})"
-    header_lines.append(document_line)
+      header_lines.append(f"Документ: {hit.document} {hit.publication_date}")
+    else:
+      header_lines.append(f"Документ: {hit.document}")
   elif hit.publication_date:
     header_lines.append(f"Дата публикации: {hit.publication_date}")
   if hit.applicant:
