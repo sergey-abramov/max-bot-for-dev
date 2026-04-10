@@ -16,6 +16,9 @@ on:
 jobs:
   migrate:
     runs-on: ubuntu-latest
+    # Нужно, если DATABASE_URL хранится в Settings → Environments → <имя> → Environment secrets.
+    # Имя должно совпадать с окружением в GitHub (часто production). Иначе secrets из окружения недоступны.
+    environment: production
     timeout-minutes: 15
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
