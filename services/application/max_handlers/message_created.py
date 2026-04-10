@@ -118,18 +118,27 @@ def _build_patent_card_text(idx: int, hit: Any) -> str:
   return "\n".join(header_lines) + f"\n\n{description}"
 
 
-def _build_patent_public_url(query: str) -> str:
-  """Build public RosPatent search URL for a given query string."""
-  return f"https://searchplatform.rospatent.gov.ru/patsearch?query={quote_plus(query)}"
+def _build_patent_public_url(*, patent_id: str, query: str) -> str:
+  """Build public RosPatent document URL with search fallback."""
+  normalized_id = _normalize_query(patent_id)
+  normalized_query = _normalize_query(query)
+  if normalized_id:
+    return (
+      f"https://searchplatform.rospatent.gov.ru/doc/{quote_plus(normalized_id)}"
+      f"?q={quote_plus(normalized_query)}&from=search_simple"
+    )
+  return f"https://searchplatform.rospatent.gov.ru/patsearch?query={quote_plus(normalized_query)}"
 
 
-def _build_patent_attachments(query: str) -> list[dict[str, Any]]:
-  """Create inline link attachment that opens RosPatent search page."""
+def _build_patent_attachments(*, patent_id: str, query: str) -> list[dict[str, Any]]:
+  """Create inline link attachment for RosPatent document/search page."""
   return [
     {
       "type": "inline_keyboard",
       "payload": {
-        "buttons": [[{"type": "link", "text": "Открыть патент", "url": _build_patent_public_url(query)}]]
+        "buttons": [
+          [{"type": "link", "text": "Открыть патент", "url": _build_patent_public_url(patent_id=patent_id, query=query)}]
+        ]
       },
     }
   ]
@@ -371,12 +380,12 @@ async def handle_message_created(update: dict[str, Any], max_api_client: MaxApiC
       return
 
     for idx, hit in enumerate(hits[:5], start=1):
-      link_query = _normalize_query(hit.document or hit.id)
+      link_query = _normalize_query(query)
       await send_message(
         max_api_client,
         update,
         text=_build_patent_card_text(idx, hit),
-        attachments=_build_patent_attachments(link_query),
+        attachments=_build_patent_attachments(patent_id=hit.id, query=link_query),
       )
 
     await _send_main_menu(update, max_api_client)
